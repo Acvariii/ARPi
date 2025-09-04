@@ -1,93 +1,71 @@
-# Hand Tracking with MediaPipe on Raspberry Pi
-# Enhanced with better error handling and camera diagnostics
+# Hand Tracking with MediaPipe for Raspberry Pi AI Camera
+# Using OpenCV instead of Picamera2 to avoid dependency issues
 
 import cv2
 import mediapipe as mp
 import time
-import sys
-
-def check_camera():
-    """Check available cameras and return the first working one"""
-    # Test cameras from index 0 to 4
-    for i in range(5):
-        cap = cv2.VideoCapture(i)
-        if cap.isOpened():
-            ret, frame = cap.read()
-            if ret:
-                print(f"Camera found at index {i}")
-                cap.release()
-                return i
-            cap.release()
-    return -1
 
 def main():
-    # Initialize MediaPipe Hands
+    # Initialize MediaPipe
     mp_drawing = mp.solutions.drawing_utils
     mp_drawing_styles = mp.solutions.drawing_styles
     mp_hands = mp.solutions.hands
-
-    # Find a working camera
-    camera_index = check_camera()
-    if camera_index == -1:
-        print("Error: No working camera found.")
-        print("Please check your camera connection and try again.")
+    
+    # Initialize camera - try different indices
+    camera = None
+    for i in range(4):  # Try cameras 0 to 3
+        camera = cv2.VideoCapture(i)
+        if camera.isOpened():
+            ret, frame = camera.read()
+            if ret:
+                print(f"Found camera at index {i}")
+                break
+            else:
+                camera.release()
+                camera = None
+        else:
+            camera = None
+    
+    if camera is None:
+        print("Error: Could not find any camera")
         return
-
-    # Initialize camera
-    cap = cv2.VideoCapture(camera_index)
     
-    # Allow camera to warm up
-    time.sleep(2.0)
+    # Set camera properties
+    camera.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+    camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+    camera.set(cv2.CAP_PROP_FPS, 30)
     
-    # Set camera resolution for Raspberry Pi compatibility
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+    # Allow camera to initialize
+    time.sleep(2)
     
-    if not cap.isOpened():
-        print("Error: Could not open camera.")
-        print("Make sure your camera is connected and not being used by another application.")
-        return
-
-    print("Camera opened successfully. Press 'Q' to quit.")
-
+    print("Camera started. Press 'Q' to quit.")
+    
+    # FPS calculation variables
+    frame_count = 0
+    start_time = time.time()
+    fps = 0
+    
     with mp_hands.Hands(
         model_complexity=0,
         min_detection_confidence=0.5,
         min_tracking_confidence=0.5,
         max_num_hands=2) as hands:
         
-        frame_count = 0
-        start_time = time.time()
-        
         while True:
-            # Read frame from camera
-            ret, frame = cap.read()
+            # Capture frame
+            ret, frame = camera.read()
+            if not ret:
+                print("Failed to grab frame")
+                break
             
-            # Check if frame was read successfully
-            if not ret or frame is None:
-                print("Failed to grab frame. Trying to reconnect...")
-                cap.release()
-                time.sleep(1)  # Wait a bit before trying again
-                
-                # Try to reconnect to camera
-                cap = cv2.VideoCapture(camera_index)
-                cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-                cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-                time.sleep(1)  # Allow camera to initialize
-                continue
+            # Flip frame horizontally for a mirror effect
+            frame = cv2.flip(frame, 1)
             
-            # Resize frame if it's not empty
-            try:
-                frame = cv2.resize(frame, (640, 480))
-            except Exception as e:
-                print(f"Error resizing frame: {e}")
-                continue
+            # Convert to RGB
+            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             
-            # Convert the BGR image to RGB
-            image_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            
-            # Process the image and detect hands
-            results = hands.process(image_rgb)
+            # Process the frame with MediaPipe
+            results = hands.process(frame_rgb)
             
             # Draw hand landmarks if detected
             if results.multi_hand_landmarks:
@@ -110,11 +88,11 @@ def main():
                     # Display coordinates
                     cv2.putText(frame, f"Index: ({cx}, {cy})", (cx-50, cy-20), 
                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
-
+            
             # Calculate and display FPS
             frame_count += 1
             elapsed_time = time.time() - start_time
-            if elapsed_time > 1:  # Update FPS every second
+            if elapsed_time > 1:
                 fps = frame_count / elapsed_time
                 frame_count = 0
                 start_time = time.time()
@@ -132,8 +110,9 @@ def main():
             # Check for quit command
             if cv2.waitKey(5) & 0xFF == ord('q'):
                 break
-
-    cap.release()
+    
+    # Clean up
+    camera.release()
     cv2.destroyAllWindows()
     print("Application closed.")
 
