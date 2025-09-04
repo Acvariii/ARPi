@@ -29,8 +29,14 @@ def main():
     video_path = os.path.join(os.path.dirname(__file__), "background_video.mp4")
     video_loaded = video_manager.load_video(video_path)
 
-    # Initialize hand tracker (start immediately)
-    hand_tracker = MultiHandTracker(screen_size=(screen_width, screen_height), max_hands=16)
+    # Initialize hand tracker (start immediately) with higher refresh + smoother rendering
+    hand_tracker = MultiHandTracker(
+        screen_size=(screen_width, screen_height),
+        max_hands=16,
+        smoothing=0.85,    # EMA alpha: higher -> less visible jitter
+        target_fps=45,     # try to process frames faster for smoother tips
+        roi_scale=0.95     # larger ROI so fingertips map reliably across projector area
+    )
     try:
         hand_tracker.start()
     except Exception:

@@ -12,7 +12,7 @@ from constants import (
     PROPERTIES, PROPERTY_SPACE_INDICES, RAILROADS, UTILITIES
 )
 
-def perform_dice_roll(screen, player, players, current_player_idx, player_position,
+def perform_dice_roll(screen, player, players, current_player_idx, player_position, positions,
                       video_manager, overlay, board_image, board_x, board_y,
                       game_x, game_y, game_width, game_height, num_players,
                       community_deck=None, chance_deck=None):
@@ -217,6 +217,12 @@ def run_monopoly_game(screen, num_players, video_manager=None, hand_tracker=None
     while running:
         current_player = players[current_player_idx]
 
+        # compute board/player positions once per frame (fixes NameError when perform_dice_roll expects positions)
+        try:
+            positions = get_player_positions(len(players), "square")
+        except Exception:
+            positions = [(0,0)] * len(players)
+
         # Prefer smoothed tips from hand_tracker (fast background thread)
         tips = []
         primary = None
@@ -378,7 +384,7 @@ def run_monopoly_game(screen, num_players, video_manager=None, hand_tracker=None
                             elif action == 2 and i == current_player_idx:
                                 # buy/mortgage handling (unchanged)
                                 if current_player.position in PROPERTY_SPACE_INDICES:
-                                    prop_idx = PROPERTY_SPACE_INDICES.index(current_current.position) if current_player.position in PROPERTY_SPACE_INDICES else None
+                                    prop_idx = PROPERTY_SPACE_INDICES.index(current_player.position) if current_player.position in PROPERTY_SPACE_INDICES else None
                                 # keep original code for buy/mortgage...
                     break
             if mouse_over_action: break

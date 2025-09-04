@@ -106,7 +106,18 @@ def show_game_selection(screen, video_manager=None, hand_tracker=None):
             draw_button(screen, button_x, button_y, button_width, button_height, game["name"], is_hovering)
             if is_hovering and hovered_button == i:
                 hover_time = current_time - hover_start_time
+                # draw hover timer where appropriate
                 draw_hover_timer(screen, mouse_pos, hover_time)
+
+        # draw fingertip indicators last so they appear on top of all UI
+        try:
+            for tip in tips:
+                pos = tip.get("screen")
+                if pos:
+                    pygame.draw.circle(screen, (0, 0, 0), pos, 16, 4)
+                    pygame.draw.circle(screen, (60, 220, 80), pos, 10)
+        except Exception:
+            pass
 
         instructions = FONT_MEDIUM.render("• Hover over a game to select •", True, TEXT_COLOR)
         screen.blit(instructions, (screen.get_width() // 2 - instructions.get_width() // 2, screen.get_height() - 80))

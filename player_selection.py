@@ -143,16 +143,6 @@ def show_game_player_selection(screen, game, video_manager=None, hand_tracker=No
             screen.fill((25, 25, 35))
         screen.blit(overlay, (0, 0))
 
-        # draw fingertip indicators from the tracker
-        try:
-            for tip in tips:
-                pos = tip.get("screen")
-                if pos:
-                    pygame.draw.circle(screen, (0, 0, 0), pos, 14, 4)
-                    pygame.draw.circle(screen, (60, 220, 80), pos, 8)
-        except Exception:
-            pass
-
         player_count_selected = None
         btn_width = 120
         btn_height = 100
@@ -236,6 +226,16 @@ def show_game_player_selection(screen, game, video_manager=None, hand_tracker=No
                     return
         else:
             exit_hover_start = None
+
+        # draw fingertip indicators last so they appear above all UI
+        try:
+            for tip in tips:
+                pos = tip.get("screen")
+                if pos:
+                    pygame.draw.circle(screen, (0, 0, 0), pos, 14, 4)
+                    pygame.draw.circle(screen, (60, 220, 80), pos, 8)
+        except Exception:
+            pass
 
         pygame.display.flip()
         clock = pygame.time.Clock()
