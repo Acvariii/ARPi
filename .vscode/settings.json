@@ -14,7 +14,9 @@
         "picamera",
         "pyautogui",
         "rects",
+        "ridx",
         "rtype",
-        "SRCALPHA"
+        "SRCALPHA",
+        "uidx"
     ]
 }

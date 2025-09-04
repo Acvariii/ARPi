@@ -9,6 +9,8 @@ except Exception:
 import pyautogui
 import time
 import threading
+import socket
+import json
 from typing import List, Dict, Tuple, Optional
 
 class MultiHandTracker:
@@ -24,7 +26,8 @@ class MultiHandTracker:
     """
     def __init__(self, screen_size: Tuple[int,int]=None, max_hands: int = 8,
                  detection_conf: float = 0.45, tracking_conf: float = 0.5,
-                 roi_scale: float = 0.95, target_fps: float = 45.0, smoothing: float = 0.6):
+                 roi_scale: float = 0.95, target_fps: float = 45.0, smoothing: float = 0.6,
+                 socket_path: Optional[str]=None):
         self.screen_w, self.screen_h = screen_size if screen_size else pyautogui.size()
         self.mp_hands = mp.solutions.hands
         self.hands = self.mp_hands.Hands(
@@ -52,9 +55,26 @@ class MultiHandTracker:
         self._alpha = smoothing  # EMA smoothing (0..1, higher = less smoothing)
         self._target_dt = 1.0 / max(5.0, min(target_fps, 60.0))
 
+        # remote mode: if socket_path provided, operate as a client reading tip updates
+        self.socket_path = socket_path
+        self._remote_thread = None
+        self._remote_running = False
+
     def start(self):
         if self._running:
             return
+        # If socket_path specified, start remote client thread and do not start local capture
+        if self.socket_path:
+            try:
+                self._remote_running = True
+                self._remote_thread = threading.Thread(target=self._remote_worker, daemon=True)
+                self._remote_thread.start()
+                self._running = True
+                return
+            except Exception:
+                self._remote_running = False
+                self._remote_thread = None
+                # fall through to local capture if remote fails
         if self._use_picam:
             try:
                 self._picam = Picamera2()
@@ -101,7 +121,55 @@ class MultiHandTracker:
         # small settle
         time.sleep(0.05)
 
+    def _remote_worker(self):
+        """Connect to unix socket and read newline-delimited JSON tip messages from camera service."""
+        path = self.socket_path
+        while self._remote_running:
+            try:
+                client = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+                client.connect(path)
+                client_file = client.makefile("r")
+                while self._remote_running:
+                    line = client_file.readline()
+                    if not line:
+                        break
+                    try:
+                        msg = json.loads(line.strip())
+                        tips = msg.get("tips", [])
+                        with self._lock:
+                            # convert into same smoothed structure quickly (no smoothing here)
+                            now = time.time()
+                            new_smoothed = {}
+                            for t in tips:
+                                hid = t.get("hand_idx", 0)
+                                pos = tuple(t.get("screen", (0,0)))
+                                new_smoothed[hid] = pos
+                                self._last_seen[hid] = now
+                            # keep recent old ones for short time
+                            for hid, (sx, sy) in list(self._smoothed.items()):
+                                if hid not in new_smoothed:
+                                    age = now - self._last_seen.get(hid, 0)
+                                    if age < 0.25:
+                                        new_smoothed[hid] = (sx, sy)
+                                    else:
+                                        self._last_seen.pop(hid, None)
+                            self._smoothed = new_smoothed
+                            self._latest_tips = [{"screen": self._smoothed[k], "hand_idx": k} for k in sorted(self._smoothed.keys())]
+                    except Exception:
+                        continue
+                try:
+                    client.close()
+                except Exception:
+                    pass
+            except Exception:
+                time.sleep(0.25)
+
     def stop(self):
+        # stop remote if running
+        self._remote_running = False
+        if self._remote_thread:
+            self._remote_thread.join(timeout=0.5)
+            self._remote_thread = None
         self._running = False
         if self._thread:
             self._thread.join(timeout=0.5)

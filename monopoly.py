@@ -197,6 +197,9 @@ def run_monopoly_game(screen, num_players, video_manager=None, hand_tracker=None
     hover_start_time = 0
     action_triggered = False
     panel_hover_start = None
+    # state for buy-buttons inside the properties panel
+    buy_hover_start = None
+    hovered_buy_prop = None
     # exit-to-main-menu hover state
     exit_hover_start = None
     EXIT_HOVER_REQUIRED = 10.0  # seconds to hover to exit to main menu
@@ -225,43 +228,44 @@ def run_monopoly_game(screen, num_players, video_manager=None, hand_tracker=None
 
         # Prefer smoothed tips from hand_tracker (fast background thread)
         tips = []
-        primary = None
         if hand_tracker:
             try:
                 tips = hand_tracker.get_tips()
             except Exception:
                 tips = []
+
         # compute player_rects so we can assign tips to players
         try:
             player_rects, action_rects_map = draw_player_control_areas(screen, players, current_player_idx, game_x, game_y, game_width, game_height, "square", hover_info)
         except Exception:
             player_rects, action_rects_map = [], []
 
-        # Determine which tip (if any) belongs to the active player:
-        active_tip_pos = None
-        if tips and player_rects and current_player_idx < len(player_rects):
-            # compute center of active player's rect
-            ar = player_rects[current_player_idx]
-            ax = ar.centerx; ay = ar.centery
-            best = None; best_d = None
-            for t in tips:
-                tx, ty = t["screen"]
-                d = math.hypot(tx - ax, ty - ay)
-                if best is None or d < best_d:
-                    best = t; best_d = d
-            # only accept tip if reasonably close (threshold relative to board size)
-            threshold = max(160, min(game_width, game_height) * 0.25)
-            if best is not None and best_d <= threshold:
-                active_tip_pos = best["screen"]
-                active_hand_idx = best["hand_idx"]
-            else:
-                active_tip_pos = None
-                active_hand_idx = None
+        # Map each detected tip to the nearest player rect center (allow simultaneous multi-player control)
+        assigned_tip_for_player = {}  # player_idx -> (x,y, hand_idx)
+        if tips and player_rects:
+            # threshold relative to board size (projector coords)
+            thresh = max(160, min(game_width, game_height) * 0.35)
+            for pi, rect in enumerate(player_rects):
+                ax, ay = rect.centerx, rect.centery
+                best = None; best_d = None
+                for t in tips:
+                    tx, ty = t["screen"]; d = math.hypot(tx - ax, ty - ay)
+                    if best is None or d < best_d:
+                        best = t; best_d = d
+                if best is not None and best_d <= thresh:
+                    assigned_tip_for_player[pi] = (best["screen"][0], best["screen"][1], best["hand_idx"])
+
+        # Determine active player's control point and active hand id (fallback to mouse)
+        active_assignment = assigned_tip_for_player.get(current_player_idx)
+        if active_assignment:
+            mouse_pos = (active_assignment[0], active_assignment[1])
+            active_hand_idx = active_assignment[2]
         else:
+            mouse_pos = pygame.mouse.get_pos()
             active_hand_idx = None
 
-        # Choose mouse_pos for hover logic: only active player's closest tip controls actions
-        mouse_pos = active_tip_pos if active_tip_pos is not None else pygame.mouse.get_pos()
+        # Choose mouse_pos for hover logic (fallback per-player if no tip)
+        # NOTE: we will use assigned_tip_for_player per-player below when checking each player's action rects.
         current_time = time.time()
 
         # --- render background & board (unchanged) ---
@@ -453,16 +457,53 @@ def run_monopoly_game(screen, num_players, video_manager=None, hand_tracker=None
                                     show_properties = True
                                     properties_player_idx = current_player_idx
                                     hover_info = None; action_triggered = False
+                            elif action == 3 and i == current_player_idx:
+                                # Open Properties panel for this player
+                                show_properties = True
+                                properties_player_idx = current_player_idx
+                                hover_info = None; action_triggered = False
                     break
-            if mouse_over_action: break
+                if mouse_over_action: break
 
         if not mouse_over_action:
             hover_info = None; action_triggered = False
 
-        # -- remainder of code for buy_buttons, popups, exit button, display.flip etc remains unchanged --
-        # draw ... (reuse rest of function below unmodified)
-        # draw properties panel, buy buttons, property popups, exit button (all use mouse_pos)
-        # (For brevity, the rest of the function is kept as in your file — only the input sourcing and tip coloring above were changed.)
+        # If properties panel is open, draw it and handle buy-house buttons (hover to trigger)
+        if show_properties and properties_player_idx is not None:
+            try:
+                # anchor panel to the player's rect if available
+                anchor = None
+                if player_rects and properties_player_idx < len(player_rects):
+                    anchor = player_rects[properties_player_idx]
+                panel_rect, buy_buttons = draw_properties_panel(screen, players[properties_player_idx], anchor_rect=anchor, player_position=positions[properties_player_idx])
+                # process buy-buttons via hover (1s)
+                buy_hit = None
+                for entry in buy_buttons:
+                    rect = entry["rect"]; prop_idx = entry["property_index"]
+                    if rect.collidepoint(mouse_pos):
+                        buy_hit = entry
+                        if hovered_buy_prop != prop_idx:
+                            hovered_buy_prop = prop_idx
+                            buy_hover_start = time.time()
+                        else:
+                            elapsed = time.time() - (buy_hover_start or time.time())
+                            draw_hover_timer(screen, mouse_pos, elapsed)
+                            if elapsed >= 1.0:
+                                # attempt to buy house
+                                bought = players[properties_player_idx].buy_house(prop_idx)
+                                buy_hover_start = None; hovered_buy_prop = None
+                                # refresh panel state visually
+                                if bought:
+                                    # keep panel open so user sees change
+                                    pass
+                                else:
+                                    # not enough money or can't buy -> keep panel open
+                                    pass
+                        break
+                if buy_hit is None:
+                    buy_hover_start = None; hovered_buy_prop = None
+            except Exception:
+                pass
 
         # draw Exit Game button (bottom-right) and require long-hover to trigger
         exit_w, exit_h = 180, 48

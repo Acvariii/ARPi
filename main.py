@@ -31,12 +31,15 @@ def main():
 
     # Initialize hand tracker (start immediately) with higher refresh + smoother rendering
     # prefer lower smoothing (more responsive), higher target_fps; tune to your Pi5 performance
+    # Projector resolution is fixed: map camera tips into projector coordinates (1920x1080).
+    # Pygame still uses the actual display resolution for rendering; the tracker always reports
+    # tip coordinates in projector space so UI logic is stable.
     hand_tracker = MultiHandTracker(
-        screen_size=(screen_width, screen_height),
+        screen_size=(1920, 1080),   # fixed projector mapping
         max_hands=8,
-        smoothing=0.60,    # lower = more responsive (less lag); increase if jittery
-        target_fps=60,     # request higher processing rate; worker will cap to available
-        roi_scale=0.98     # almost full-frame mapping (use full projector area)
+        smoothing=0.60,
+        target_fps=60,
+        roi_scale=0.98
     )
     try:
         hand_tracker.start()
