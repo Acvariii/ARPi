@@ -350,10 +350,13 @@ def run_monopoly_game(screen, num_players, video_manager=None, hand_tracker=None
                             if action == 1 and i == current_player_idx:
                                 # roll / end-turn handling (same as before)
                                 if not current_player.has_rolled:
-                                    cont, res = perform_dice_roll(screen, current_player, players, current_player_idx, positions[current_player_idx],
-                                                                  video_manager, overlay, board_image, board_x, board_y,
-                                                                  game_x, game_y, game_width, game_height, num_players,
-                                                                  community_deck=community_deck, chance_deck=chance_deck)
+                                    cont, res = perform_dice_roll(
+                                        screen, current_player, players, current_player_idx,
+                                        positions[current_player_idx], positions,
+                                        video_manager, overlay, board_image, board_x, board_y,
+                                        game_x, game_y, game_width, game_height, num_players,
+                                        community_deck=community_deck, chance_deck=chance_deck
+                                    )
                                     if not cont: return False
                                     if isinstance(res, dict):
                                         rtype = res.get("type")
@@ -363,10 +366,13 @@ def run_monopoly_game(screen, num_players, video_manager=None, hand_tracker=None
                                         current_player_idx = (current_player_idx + 1) % len(players)
                                 else:
                                     if getattr(current_player, "can_reroll", False):
-                                        cont, res = perform_dice_roll(screen, current_player, players, current_player_idx, positions[current_player_idx],
-                                                                      video_manager, overlay, board_image, board_x, board_y,
-                                                                      game_x, game_y, game_width, game_height, num_players,
-                                                                      community_deck=community_deck, chance_deck=chance_deck)
+                                        cont, res = perform_dice_roll(
+                                            screen, current_player, players, current_player_idx,
+                                            positions[current_player_idx], positions,
+                                            video_manager, overlay, board_image, board_x, board_y,
+                                            game_x, game_y, game_width, game_height, num_players,
+                                            community_deck=community_deck, chance_deck=chance_deck
+                                        )
                                         if not cont: return False
                                         if isinstance(res, dict):
                                             rtype = res.get("type")
