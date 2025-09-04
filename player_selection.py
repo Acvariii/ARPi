@@ -117,12 +117,16 @@ def show_game_player_selection(screen, game, video_manager=None, hand_tracker=No
 
     running = True
     while running:
+        # prefer hand tracker primary tip; fallback to mouse
         primary = None
+        tips = []
         if hand_tracker:
             try:
                 primary = hand_tracker.get_primary()
+                tips = hand_tracker.get_tips()
             except Exception:
                 primary = None
+                tips = []
         mouse_pos = primary if primary is not None else pygame.mouse.get_pos()
         current_time = time.time()
 
@@ -138,6 +142,16 @@ def show_game_player_selection(screen, game, video_manager=None, hand_tracker=No
         else:
             screen.fill((25, 25, 35))
         screen.blit(overlay, (0, 0))
+
+        # draw fingertip indicators from the tracker
+        try:
+            for tip in tips:
+                pos = tip.get("screen")
+                if pos:
+                    pygame.draw.circle(screen, (0, 0, 0), pos, 14, 4)
+                    pygame.draw.circle(screen, (60, 220, 80), pos, 8)
+        except Exception:
+            pass
 
         player_count_selected = None
         btn_width = 120

@@ -171,29 +171,3 @@ class MultiHandTracker:
         if not tips:
             return None
         return tips[0]["screen"]
-
-
-# -----------------------
-# Main loop
-# -----------------------
-tracker = MultiHandTracker(max_hands=16, detection_conf=0.7, tracking_conf=0.6, roi_scale=0.8)
-tracker.start()
-try:
-    while True:
-        tips = tracker.get_tips()
-        primary = tracker.get_primary()
-
-        # For visualization: draw tips and primary hand
-        frame = tracker._capture_frame()
-        if frame is not None:
-            for tip in tips:
-                cv2.circle(frame, tip["roi"], 10, (0,255,0), -1)
-            if primary:
-                cv2.circle(frame, primary, 15, (255,0,0), 3)
-            cv2.imshow("Hand Tracking", frame)
-
-        if cv2.waitKey(1) & 0xFF == 27:
-            break
-finally:
-    tracker.stop()
-    cv2.destroyAllWindows()

@@ -33,11 +33,15 @@ def show_game_selection(screen, video_manager=None, hand_tracker=None):
     while running:
         # prefer hand tracker primary tip; fallback to mouse
         primary = None
+        tips = []
         if hand_tracker:
             try:
+                # get_primary still useful for hover logic; get_tips used for rendering visible cursors
                 primary = hand_tracker.get_primary()
+                tips = hand_tracker.get_tips()
             except Exception:
                 primary = None
+                tips = []
         mouse_pos = primary if primary is not None else pygame.mouse.get_pos()
         current_time = time.time()
 
@@ -56,6 +60,18 @@ def show_game_selection(screen, video_manager=None, hand_tracker=None):
             screen.fill((25, 25, 35))
 
         screen.blit(overlay, (0, 0))
+
+        # draw fingertip indicators from the tracker (so you see the circle on the projected table)
+        try:
+            for tip in tips:
+                # tip["screen"] is (x, y) mapped to projector/screen coordinates
+                pos = tip.get("screen")
+                if pos:
+                    # outer ring + inner dot for good visibility
+                    pygame.draw.circle(screen, (0, 0, 0), pos, 16, 4)
+                    pygame.draw.circle(screen, (60, 220, 80), pos, 10)
+        except Exception:
+            pass
 
         selected_game = None
         for i, game in enumerate(GAMES):

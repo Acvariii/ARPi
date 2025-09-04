@@ -216,12 +216,17 @@ def run_monopoly_game(screen, num_players, video_manager=None, hand_tracker=None
     running = True
     while running:
         current_player = players[current_player_idx]
+
+        # Prefer hand tracker primary tip for hover; also fetch all tips for rendering
         primary = None
+        tips = []
         if hand_tracker:
             try:
                 primary = hand_tracker.get_primary()
+                tips = hand_tracker.get_tips()
             except Exception:
                 primary = None
+                tips = []
         mouse_pos = primary if primary is not None else pygame.mouse.get_pos()
         current_time = time.time()
 
@@ -276,6 +281,16 @@ def run_monopoly_game(screen, num_players, video_manager=None, hand_tracker=None
             player_rects, action_rects_map = draw_player_control_areas(screen, players, current_player_idx, game_x, game_y, game_width, game_height, "square", hover_info)
         except Exception:
             player_rects, action_rects_map = [], []
+
+        # draw fingertip indicators from the tracker (on top of UI)
+        try:
+            for tip in tips:
+                pos = tip.get("screen")
+                if pos:
+                    pygame.draw.circle(screen, (0, 0, 0), pos, 14, 4)
+                    pygame.draw.circle(screen, (60, 220, 80), pos, 8)
+        except Exception:
+            pass
 
         mouse_over_action = False
         for i, action_rects in enumerate(action_rects_map):
