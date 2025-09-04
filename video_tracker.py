@@ -1,10 +1,8 @@
-# Hand Tracking using rpicam-vid stream
-# This approach uses rpicam-vid to capture video and pipe it to OpenCV
+# Hand Tracking with OpenCV and libcamera
+# First make sure you have the latest OpenCV with libcamera support
 
 import cv2
 import mediapipe as mp
-import subprocess
-import numpy as np
 import time
 
 def main():
@@ -13,22 +11,39 @@ def main():
     mp_drawing_styles = mp.solutions.drawing_styles
     mp_hands = mp.solutions.hands
     
-    # Start rpicam-vid process
-    command = [
-        'rpicam-vid',
-        '-t', '0',           # Run indefinitely
-        '--width', '640',    # Width
-        '--height', '480',   # Height
-        '--framerate', '30', # Framerate
-        '-o', '-'            # Output to stdout
+    # Try different camera backends
+    backends = [
+        cv2.CAP_V4L2,
+        cv2.CAP_ANY,
+        cv2.CAP_FFMPEG,
     ]
     
-    process = subprocess.Popen(
-        command,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.DEVNULL,
-        bufsize=10**8
-    )
+    camera = None
+    for backend in backends:
+        try:
+            print(f"Trying backend: {backend}")
+            camera = cv2.VideoCapture(backend)
+            if camera.isOpened():
+                ret, frame = camera.read()
+                if ret:
+                    print(f"Success with backend: {backend}")
+                    break
+                camera.release()
+                camera = None
+        except:
+            camera = None
+    
+    if camera is None:
+        print("Error: Could not open camera with any backend")
+        return
+    
+    # Set camera properties
+    camera.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+    camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+    camera.set(cv2.CAP_PROP_FPS, 15)
+    
+    # Allow camera to initialize
+    time.sleep(2)
     
     print("Camera started. Press 'Q' to quit.")
     
@@ -44,14 +59,15 @@ def main():
         max_num_hands=2) as hands:
         
         while True:
-            # Read frame from rpicam-vid output
-            # This is a simplified approach - in practice you'd need to parse the stream properly
-            raw_frame = process.stdout.read(640 * 480 * 3)
-            if len(raw_frame) != 640 * 480 * 3:
+            # Capture frame
+            ret, frame = camera.read()
+            if not ret:
+                print("Failed to grab frame")
+                time.sleep(0.1)
                 continue
-                
-            # Convert to numpy array
-            frame = np.frombuffer(raw_frame, dtype=np.uint8).reshape((480, 640, 3))
+            
+            # Flip frame horizontally for a mirror effect
+            frame = cv2.flip(frame, 1)
             
             # Convert to RGB
             frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -88,11 +104,11 @@ def main():
             cv2.imshow('MediaPipe Hands - Raspberry Pi', frame)
             
             # Check for quit command
-            if cv2.waitKey(5) & 0xFF == ord('q'):
+            if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
     
     # Clean up
-    process.terminate()
+    camera.release()
     cv2.destroyAllWindows()
     print("Application closed.")
 
