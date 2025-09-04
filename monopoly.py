@@ -407,10 +407,52 @@ def run_monopoly_game(screen, num_players, video_manager=None, hand_tracker=None
                                         current_player_idx = (current_player_idx + 1) % len(players)
                                         hover_info = None; action_triggered = False
                             elif action == 2 and i == current_player_idx:
-                                # buy/mortgage handling (unchanged)
+                                # buy/mortgage handling
+                                # Determine what kind of space we're on and attempt purchase if available.
+                                purchased = False
+                                popup_result = None
+                                # Property space
                                 if current_player.position in PROPERTY_SPACE_INDICES:
-                                    prop_idx = PROPERTY_SPACE_INDICES.index(current_player.position) if current_player.position in PROPERTY_SPACE_INDICES else None
-                                # keep original code for buy/mortgage...
+                                    prop_idx = PROPERTY_SPACE_INDICES.index(current_player.position)
+                                    # check ownership
+                                    owned = any((p_prop.get("kind") == "property" and p_prop.get("index") == prop_idx)
+                                                for pl in players for p_prop in pl.properties)
+                                    price = PROPERTIES[prop_idx]["price"]
+                                    if not owned and current_player.money >= price:
+                                        if current_player.buy_property(prop_idx):
+                                            purchased = True
+                                            popup_result = {"type":"property", "property": PROPERTIES[prop_idx], "owner": current_player, "paid": price}
+                                # Railroad space
+                                elif current_player.position in RAILROAD_SPACES:
+                                    ridx = RAILROAD_SPACES.index(current_player.position)
+                                    owned = any((p_prop.get("kind") == "railroad" and p_prop.get("index") == ridx)
+                                                for pl in players for p_prop in pl.properties)
+                                    price = RAILROADS[ridx]["price"]
+                                    if not owned and current_player.money >= price:
+                                        if current_player.buy_railroad(ridx):
+                                            purchased = True
+                                            popup_result = {"type":"railroad", "property": RAILROADS[ridx], "owner": current_player, "paid": price}
+                                # Utility space
+                                elif current_player.position in UTILITY_SPACES:
+                                    uidx = UTILITY_SPACES.index(current_player.position)
+                                    owned = any((p_prop.get("kind") == "utility" and p_prop.get("index") == uidx)
+                                                for pl in players for p_prop in pl.properties)
+                                    price = UTILITIES[uidx]["price"]
+                                    if not owned and current_player.money >= price:
+                                        if current_player.buy_utility(uidx):
+                                            purchased = True
+                                            popup_result = {"type":"utility", "property": UTILITIES[uidx], "owner": current_player, "paid": price}
+
+                                if purchased:
+                                    # feedback to UI: show a small popup using existing popup function
+                                    show_property_popup = True
+                                    current_property = popup_result
+                                else:
+                                    # If cannot buy, fall back to mortgage UI or show message popup
+                                    # Here we simply open the properties panel so player can mortgage/buy houses
+                                    show_properties = True
+                                    properties_player_idx = current_player_idx
+                                    hover_info = None; action_triggered = False
                     break
             if mouse_over_action: break
 

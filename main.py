@@ -30,12 +30,13 @@ def main():
     video_loaded = video_manager.load_video(video_path)
 
     # Initialize hand tracker (start immediately) with higher refresh + smoother rendering
+    # prefer lower smoothing (more responsive), higher target_fps; tune to your Pi5 performance
     hand_tracker = MultiHandTracker(
         screen_size=(screen_width, screen_height),
-        max_hands=16,
-        smoothing=0.85,    # EMA alpha: higher -> less visible jitter
-        target_fps=45,     # try to process frames faster for smoother tips
-        roi_scale=0.95     # larger ROI so fingertips map reliably across projector area
+        max_hands=8,
+        smoothing=0.60,    # lower = more responsive (less lag); increase if jittery
+        target_fps=60,     # request higher processing rate; worker will cap to available
+        roi_scale=0.98     # almost full-frame mapping (use full projector area)
     )
     try:
         hand_tracker.start()

@@ -23,8 +23,8 @@ class MultiHandTracker:
       get_primary() -> (x,y) or None
     """
     def __init__(self, screen_size: Tuple[int,int]=None, max_hands: int = 8,
-                 detection_conf: float = 0.5, tracking_conf: float = 0.5,
-                 roi_scale: float = 0.8, target_fps: float = 30.0, smoothing: float = 0.6):
+                 detection_conf: float = 0.45, tracking_conf: float = 0.5,
+                 roi_scale: float = 0.95, target_fps: float = 45.0, smoothing: float = 0.6):
         self.screen_w, self.screen_h = screen_size if screen_size else pyautogui.size()
         self.mp_hands = mp.solutions.hands
         self.hands = self.mp_hands.Hands(
@@ -58,17 +58,29 @@ class MultiHandTracker:
         if self._use_picam:
             try:
                 self._picam = Picamera2()
-                config = self._picam.create_preview_configuration(main={"size": (800, 600)})
+                # use a modest, fast configuration; smaller frame -> faster Mediapipe inference
+                try:
+                    config = self._picam.create_preview_configuration(main={"size": (800, 600)})
+                except Exception:
+                    config = self._picam.create_preview_configuration(main={"size": (640, 480)})
                 self._picam.configure(config)
                 try:
                     self._picam.set_controls({
-                        "ExposureTime": 25000,
+                        # best-effort autofocus / auto-exposure controls (may be ignored on some sensors)
+                        "ExposureTime": 20000,
                         "AnalogueGain": 4.0,
-                        "Brightness": 0.3
+                        "Brightness": 0.3,
+                        "AwbEnable": True
                     })
                 except Exception:
                     pass
                 self._picam.start()
+                # try a best-effort focus command if supported (not all cameras/PiISP support this)
+                try:
+                    # these keys may not be present; ignore failures
+                    self._picam.set_controls({"AfMode": 1})
+                except Exception:
+                    pass
             except Exception:
                 self._picam = None
                 self._use_picam = False
@@ -76,8 +88,9 @@ class MultiHandTracker:
             self._cap = cv2.VideoCapture(0)
             # try to set a modest resolution for speed
             try:
-                self._cap.set(cv2.CAP_PROP_FRAME_WIDTH, 800)
-                self._cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 600)
+                self._cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+                self._cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+                self._cap.set(cv2.CAP_PROP_FPS, int( min(60, 1.0 / max(0.001, self._target_dt)) ))
             except Exception:
                 pass
 
@@ -151,6 +164,7 @@ class MultiHandTracker:
             if frame is None:
                 time.sleep(self._target_dt)
                 continue
+            # lightweight enhancement only (keep cheap to preserve fps)
             frame = self.enhance_frame(frame)
             h, w = frame.shape[:2]
 
@@ -174,8 +188,9 @@ class MultiHandTracker:
                     pip = hand_landmarks.landmark[6]
                     mcp = hand_landmarks.landmark[5]
                     # simple finger-extended test
+                    # more permissive threshold so fingertips are detected when smaller in frame
                     extended = self._distance_coords((tip.x, tip.y, tip.z if hasattr(tip,'z') else 0),
-                                                     (pip.x, pip.y, pip.z if hasattr(pip,'z') else 0)) > 0.03
+                                                     (pip.x, pip.y, pip.z if hasattr(pip,'z') else 0)) > 0.02
                     x_tip = int(tip.x * w)
                     y_tip = int(tip.y * h)
                     if x_start <= x_tip <= x_end and y_start <= y_tip <= y_end and extended:
