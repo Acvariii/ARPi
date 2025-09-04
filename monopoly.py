@@ -200,6 +200,8 @@ def run_monopoly_game(screen, num_players, video_manager=None, hand_tracker=None
     # state for buy-buttons inside the properties panel
     buy_hover_start = None
     hovered_buy_prop = None
+    # per-player hover/trigger state: keys are (player_idx, action)
+    hover_states = {}
     # exit-to-main-menu hover state
     exit_hover_start = None
     EXIT_HOVER_REQUIRED = 10.0  # seconds to hover to exit to main menu
@@ -475,35 +477,69 @@ def run_monopoly_game(screen, num_players, video_manager=None, hand_tracker=None
                 anchor = None
                 if player_rects and properties_player_idx < len(player_rects):
                     anchor = player_rects[properties_player_idx]
-                panel_rect, buy_buttons = draw_properties_panel(screen, players[properties_player_idx], anchor_rect=anchor, player_position=positions[properties_player_idx])
-                # process buy-buttons via hover (1s)
+                panel_rect, buy_buttons = draw_properties_panel(
+                    screen,
+                    players[properties_player_idx],
+                    anchor_rect=anchor,
+                    player_position=positions[properties_player_idx]
+                )
+
+                # determine control point for the panel owner (their assigned tip if present,
+                # otherwise if the owner is the active player allow system mouse fallback)
+                control_point = None
+                assn = assigned_tip_for_player.get(properties_player_idx)
+                if assn:
+                    control_point = (assn[0], assn[1])
+                elif properties_player_idx == current_player_idx:
+                    control_point = pygame.mouse.get_pos()
+
+                # If control_point exists, handle buy-button hover using it; also allow closing panel
                 buy_hit = None
-                for entry in buy_buttons:
-                    rect = entry["rect"]; prop_idx = entry["property_index"]
-                    if rect.collidepoint(mouse_pos):
-                        buy_hit = entry
-                        if hovered_buy_prop != prop_idx:
-                            hovered_buy_prop = prop_idx
-                            buy_hover_start = time.time()
+                if control_point:
+                    for entry in buy_buttons:
+                        rect = entry["rect"]; prop_idx = entry["property_index"]
+                        if rect.collidepoint(control_point):
+                            buy_hit = entry
+                            if hovered_buy_prop != prop_idx:
+                                hovered_buy_prop = prop_idx
+                                buy_hover_start = time.time()
+                            else:
+                                elapsed = time.time() - (buy_hover_start or time.time())
+                                draw_hover_timer(screen, control_point, elapsed)
+                                if elapsed >= 1.0:
+                                    # attempt to buy house
+                                    bought = players[properties_player_idx].buy_house(prop_idx)
+                                    buy_hover_start = None; hovered_buy_prop = None
+                                    # keep panel open so user sees change; no extra action required here
+                            break
+                    if buy_hit is None:
+                        buy_hover_start = None; hovered_buy_prop = None
+
+                    # closing: hovering the panel itself for 1s closes it (owner only)
+                    if panel_rect.collidepoint(control_point):
+                        if panel_hover_start is None:
+                            panel_hover_start = time.time()
                         else:
-                            elapsed = time.time() - (buy_hover_start or time.time())
-                            draw_hover_timer(screen, mouse_pos, elapsed)
-                            if elapsed >= 1.0:
-                                # attempt to buy house
-                                bought = players[properties_player_idx].buy_house(prop_idx)
-                                buy_hover_start = None; hovered_buy_prop = None
-                                # refresh panel state visually
-                                if bought:
-                                    # keep panel open so user sees change
-                                    pass
-                                else:
-                                    # not enough money or can't buy -> keep panel open
-                                    pass
-                        break
-                if buy_hit is None:
+                            ph_elapsed = time.time() - panel_hover_start
+                            draw_hover_timer(screen, control_point, ph_elapsed)
+                            if ph_elapsed >= 1.0:
+                                # close panel and reset states
+                                show_properties = False
+                                properties_player_idx = None
+                                panel_hover_start = None
+                                buy_hover_start = None
+                                hovered_buy_prop = None
+                                # clear per-player hover states so no accidental triggers remain
+                                hover_states.clear()
+                    else:
+                        panel_hover_start = None
+                else:
+                    # no control point for this owner -> reset panel hover timers
+                    panel_hover_start = None
                     buy_hover_start = None; hovered_buy_prop = None
             except Exception:
-                pass
+                # on exception keep panel open but reset ephemeral hover timers
+                panel_hover_start = None; buy_hover_start = None; hovered_buy_prop = None
 
         # draw Exit Game button (bottom-right) and require long-hover to trigger
         exit_w, exit_h = 180, 48
