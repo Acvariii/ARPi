@@ -38,12 +38,11 @@ picam2 = Picamera2()
 config = picam2.create_preview_configuration(main={"size": (640, 480)})
 picam2.configure(config)
 
-# Low-light settings
+# Correct low-light settings
 picam2.set_controls({
-    controls.AeExposureMode: controls.AeExposureModeEnum.Normal,
-    controls.AeExposureTime: 20000,  # 20ms exposure
-    controls.AnalogueGain: 4.0,      # amplify light
-    controls.Brightness: 0.2,        # optional tweak
+    controls.ExposureTime: 20000,  # 20ms exposure
+    controls.AnalogueGain: 4.0,    # amplify light
+    controls.Brightness: 0.2       # optional tweak
 })
 
 picam2.start()
@@ -52,6 +51,7 @@ picam2.start()
 # ROI settings
 # -----------------------
 roi_scale = 0.7  # 0-1, smaller ROI maps to cursor
+
 # -----------------------
 # Main loop
 # -----------------------
