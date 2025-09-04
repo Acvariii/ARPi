@@ -42,7 +42,7 @@ picam2.configure(config)
 picam2.set_controls({
     "ExposureTime": 20000,  # 20ms exposure
     "AnalogueGain": 4.0,    # amplify light
-    "Brightness": 0.5       # optional tweak
+    "Brightness": 0.1       # optional tweak
 })
 
 picam2.start()
