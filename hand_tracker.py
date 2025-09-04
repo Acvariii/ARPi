@@ -41,8 +41,8 @@ picam2.configure(config)
 # Correct low-light settings
 picam2.set_controls({
     "ExposureTime": 20000,  # 20ms exposure
-    "AnalogueGain": 4.0,    # amplify light
-    "Brightness": 0.1       # optional tweak
+    #"AnalogueGain": 4.0,    # amplify light
+    #"Brightness": 0.1       # optional tweak
 })
 
 picam2.start()
