@@ -43,19 +43,28 @@ def get_player_positions(num_players, board_shape):
 def get_action_rectangles(player_idx, position, side, count_on_side, player_index_on_side, player_width, player_height):
     """Calculate rectangles for action buttons based on player position and side rectangle"""
     action_rects = {}
+    gap = 8
     if position in ["top", "bottom"]:
-        action_width = (player_width - 40) // 3
-        action_height = max(20, player_height - 30)
+        # three horizontally-arranged actions centered vertically within player's strip
+        action_width = max(60, (player_width - 40 - (2 * gap)) // 3)
+        action_height = max(36, player_height - 30)
+        total_w = 3 * action_width + 2 * gap
+        base_x = side["x"] + player_index_on_side * player_width + max(10, (player_width - total_w) // 2)
+        base_y = side["y"] + max(8, (player_height - action_height) // 2)
         for action in range(1, 4):
-            action_x = side["x"] + player_index_on_side * player_width + 20 + (action - 1) * (action_width + 5)
-            action_y = side["y"] + 15
+            action_x = base_x + (action - 1) * (action_width + gap)
+            action_y = base_y
             action_rects[action] = pygame.Rect(action_x, action_y, action_width, action_height)
     else:
-        action_width = max(20, player_width - 30)
-        action_height = (player_height - 40) // 3
+        # three vertically-arranged actions centered horizontally within player's strip
+        action_width = max(36, player_width - 30)
+        action_height = max(40, (player_height - 40 - 2 * gap) // 3)
+        total_h = 3 * action_height + 2 * gap
+        base_x = side["x"] + max(8, (player_width - action_width) // 2)
+        base_y = side["y"] + player_index_on_side * player_height + max(10, (player_height - total_h) // 2)
         for action in range(1, 4):
-            action_x = side["x"] + 15
-            action_y = side["y"] + player_index_on_side * player_height + 20 + (action - 1) * (action_height + 5)
+            action_x = base_x
+            action_y = base_y + (action - 1) * (action_height + gap)
             action_rects[action] = pygame.Rect(action_x, action_y, action_width, action_height)
     return action_rects
 

@@ -304,6 +304,25 @@ def run_monopoly_game(screen, num_players, video_manager=None, hand_tracker=None
         except Exception:
             player_rects, action_rects_map = [], []
 
+        # If a popup was requested by landing logic, draw it here (before fingertip overlay)
+        if show_property_popup and current_property:
+            try:
+                # determine player-side string for popup rotation/anchoring
+                positions = get_player_positions(len(players), "square")
+                player_side = positions[current_player_idx] if current_player_idx < len(positions) else "bottom"
+                ptype = current_property.get("type")
+                if ptype in ("chance", "community"):
+                    # card-based popup
+                    card = current_property.get("card")
+                    draw_card_popup(screen, card, player_position=player_side)
+                elif ptype in ("property", "railroad", "utility"):
+                    prop = current_property.get("property")
+                    owner = current_property.get("owner")
+                    paid = current_property.get("paid")
+                    draw_property_popup(screen, prop, owner=owner, paid=paid, player_position=player_side)
+            except Exception:
+                pass
+
         # draw fingertips: color the tip assigned to the active player with that player's color,
         # others desaturated / neutral
         try:

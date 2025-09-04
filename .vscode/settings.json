@@ -1,0 +1,20 @@
+{
+    "cSpell.words": [
+        "behaviour",
+        "bidx",
+        "blit",
+        "centerx",
+        "centery",
+        "CLAHE",
+        "collidepoint",
+        "consec",
+        "desaturated",
+        "ndarray",
+        "picam",
+        "picamera",
+        "pyautogui",
+        "rects",
+        "rtype",
+        "SRCALPHA"
+    ]
+}
