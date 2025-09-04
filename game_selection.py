@@ -15,7 +15,7 @@ def update_video_background(screen, video_manager):
         print(f"Error updating video background: {e}")
         return False
 
-def show_game_selection(screen, video_manager=None):
+def show_game_selection(screen, video_manager=None, hand_tracker=None):
     """Display the main game selection screen with video background"""
     clock = pygame.time.Clock()
     button_width, button_height = 300, 80
@@ -31,7 +31,14 @@ def show_game_selection(screen, video_manager=None):
 
     running = True
     while running:
-        mouse_pos = pygame.mouse.get_pos()
+        # prefer hand tracker primary tip; fallback to mouse
+        primary = None
+        if hand_tracker:
+            try:
+                primary = hand_tracker.get_primary()
+            except Exception:
+                primary = None
+        mouse_pos = primary if primary is not None else pygame.mouse.get_pos()
         current_time = time.time()
 
         for event in pygame.event.get():
@@ -69,7 +76,7 @@ def show_game_selection(screen, video_manager=None):
 
         if selected_game:
             from player_selection import show_game_player_selection
-            show_game_player_selection(screen, selected_game, video_manager)
+            show_game_player_selection(screen, selected_game, video_manager, hand_tracker=hand_tracker)
             hovered_button = None
 
         title = FONT_LARGE.render("ARPi Game Selector", True, TEXT_COLOR)

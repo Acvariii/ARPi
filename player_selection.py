@@ -28,12 +28,12 @@ def show_launch_confirmation(screen, game_name, num_players, video_manager=None)
     pygame.display.flip()
     pygame.time.wait(2000)
 
-def launch_game(screen, game_name, num_players, video_manager=None):
+def launch_game(screen, game_name, num_players, video_manager=None, hand_tracker=None):
     try:
         if game_name.lower() == "monopoly":
             from monopoly import run_monopoly_game
             show_launch_confirmation(screen, game_name, num_players, video_manager)
-            return run_monopoly_game(screen, num_players, video_manager)
+            return run_monopoly_game(screen, num_players, video_manager, hand_tracker=hand_tracker)
         else:
             show_launch_confirmation(screen, game_name, num_players, video_manager)
             return True
@@ -88,7 +88,7 @@ def draw_player_control_areas_preview(screen, num_players, game_x, game_y, game_
                 action_y = player_y + 20 + j * (action_height + 5)
                 pygame.draw.rect(screen, (60, 60, 80), (action_x, action_y, action_width, action_height), border_radius=8)
 
-def show_game_player_selection(screen, game, video_manager=None):
+def show_game_player_selection(screen, game, video_manager=None, hand_tracker=None):
     clock = pygame.time.Clock()
     selected_players = 2
     max_players = game["max_players"]
@@ -117,7 +117,13 @@ def show_game_player_selection(screen, game, video_manager=None):
 
     running = True
     while running:
-        mouse_pos = pygame.mouse.get_pos()
+        primary = None
+        if hand_tracker:
+            try:
+                primary = hand_tracker.get_primary()
+            except Exception:
+                primary = None
+        mouse_pos = primary if primary is not None else pygame.mouse.get_pos()
         current_time = time.time()
 
         for event in pygame.event.get():
@@ -161,11 +167,8 @@ def show_game_player_selection(screen, game, video_manager=None):
                 hovered_button = "start"
                 hover_start_time = current_time
             if current_time - hover_start_time >= 1.0:
-                game_completed = launch_game(screen, game["name"], selected_players, video_manager)
+                game_completed = launch_game(screen, game["name"], selected_players, video_manager, hand_tracker=hand_tracker)
                 hovered_button = None
-                # If the launched game returns False it means "back to game selection".
-                # Propagate that by returning from this player-selection screen so
-                # control goes back to game_selection.show_game_selection.
                 if game_completed is False:
                     return
         else:

@@ -185,7 +185,7 @@ def perform_dice_roll(screen, player, players, current_player_idx, player_positi
     player.has_rolled = True
     return True, result
 
-def run_monopoly_game(screen, num_players, video_manager=None):
+def run_monopoly_game(screen, num_players, video_manager=None, hand_tracker=None):
     clock = pygame.time.Clock()
     players = initialize_players(num_players)
     current_player_idx = 0
@@ -216,7 +216,13 @@ def run_monopoly_game(screen, num_players, video_manager=None):
     running = True
     while running:
         current_player = players[current_player_idx]
-        mouse_pos = pygame.mouse.get_pos()
+        primary = None
+        if hand_tracker:
+            try:
+                primary = hand_tracker.get_primary()
+            except Exception:
+                primary = None
+        mouse_pos = primary if primary is not None else pygame.mouse.get_pos()
         current_time = time.time()
 
         positions = get_player_positions(len(players), "square")
@@ -430,20 +436,18 @@ def run_monopoly_game(screen, num_players, video_manager=None):
         exit_w, exit_h = 180, 48
         exit_x = screen.get_width() - exit_w - 16
         exit_y = screen.get_height() - exit_h - 16
-        # use a distinct color for exit button
         exit_rect = draw_button(screen, exit_x, exit_y, exit_w, exit_h, "EXIT GAME", False, color=(160,40,40))
         if exit_rect.collidepoint(mouse_pos):
             if exit_hover_start is None:
                 exit_hover_start = current_time
             else:
                 hover_time = current_time - exit_hover_start
-                # show hover progress near cursor; reuse hover timer UI with required_time
                 draw_hover_timer(screen, mouse_pos, hover_time, required_time=EXIT_HOVER_REQUIRED)
                 if hover_time >= EXIT_HOVER_REQUIRED:
-                    # return False to indicate exiting back to prior menu
                     return False
         else:
             exit_hover_start = None
+
         pygame.display.flip()
         clock.tick(60)
 

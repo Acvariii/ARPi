@@ -3,6 +3,7 @@ import sys
 import os
 from constants import init_fonts
 from video_manager import VideoManager
+from hand_tracker import MultiHandTracker
 
 def main():
     """Main function to initialize and run the game selector"""
@@ -28,12 +29,24 @@ def main():
     video_path = os.path.join(os.path.dirname(__file__), "background_video.mp4")
     video_loaded = video_manager.load_video(video_path)
 
+    # Initialize hand tracker (start immediately)
+    hand_tracker = MultiHandTracker(screen_size=(screen_width, screen_height), max_hands=16)
+    try:
+        hand_tracker.start()
+    except Exception:
+        # ensure app still runs if camera unavailable
+        pass
+
     # Run the game selection screen
     try:
-        running = show_game_selection(screen, video_manager if video_loaded else None)
+        running = show_game_selection(screen, video_manager if video_loaded else None, hand_tracker=hand_tracker)
     finally:
         # Clean up
         video_manager.release()
+        try:
+            hand_tracker.stop()
+        except Exception:
+            pass
         pygame.quit()
     if not running:
         sys.exit()
