@@ -43,11 +43,6 @@ picam2.set_controls({
 })
 picam2.start()
 
-# -----------------------
-# Background subtractor
-# -----------------------
-bg_subtractor = cv2.createBackgroundSubtractorMOG2(history=100, varThreshold=50, detectShadows=False)
-
 # ROI
 roi_scale = 0.8
 
@@ -55,22 +50,17 @@ roi_scale = 0.8
 # Frame preprocessing
 # -----------------------
 def enhance_frame(frame):
-    # Convert to HSV for brightness normalization
-    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-    h, s, v = cv2.split(hsv)
-
-    # CLAHE on V channel
+    # Keep RGB; apply CLAHE + gamma on each channel
+    lab = cv2.cvtColor(frame, cv2.COLOR_BGR2LAB)
+    l, a, b = cv2.split(lab)
     clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8,8))
-    v = clahe.apply(v)
-
-    # Gamma correction on V channel
+    l = clahe.apply(l)
+    lab = cv2.merge([l, a, b])
+    frame = cv2.cvtColor(lab, cv2.COLOR_LAB2BGR)
+    # Gamma correction
     gamma = 1.3
     lookUpTable = np.array([((i/255.0)**(1.0/gamma))*255 for i in np.arange(0,256)]).astype("uint8")
-    v = cv2.LUT(v, lookUpTable)
-
-    hsv = cv2.merge([h, s, v])
-    frame = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
-    return frame
+    return cv2.LUT(frame, lookUpTable)
 
 # -----------------------
 # Main loop
@@ -87,34 +77,16 @@ while True:
     y_start = (h - roi_h) // 2
     x_end, y_end = x_start + roi_w, y_start + roi_h
 
-    roi_frame = frame[y_start:y_end, x_start:x_end]
-
     # -------------------
-    # Soft background suppression
-    # -------------------
-    fg_mask = bg_subtractor.apply(roi_frame)
-    fg_mask = cv2.morphologyEx(fg_mask, cv2.MORPH_OPEN, np.ones((3,3), np.uint8))
-
-    # Normalize mask to 0-1
-    mask_float = fg_mask.astype(np.float32)/255.0
-    mask_3ch = cv2.merge([mask_float]*3)
-
-    # Apply soft suppression: reduce background intensity but keep color
-    roi_frame_processed = roi_frame.astype(np.float32) * (0.5 + 0.5*mask_3ch)  # 50% background, 100% foreground
-    roi_frame_processed = roi_frame_processed.astype(np.uint8)
-
-    # Replace ROI in original frame
-    frame[y_start:y_end, x_start:x_end] = roi_frame_processed
-
-    # -------------------
-    # MediaPipe
+    # MediaPipe detection (full frame)
     # -------------------
     rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
     result = hands.process(rgb_frame)
 
-    # Draw ROI
+    # Draw ROI rectangle
     cv2.rectangle(frame, (x_start, y_start), (x_end, y_end), (200,200,200), 2)
 
+    # Hand tracking & cursor mapping
     if result.multi_hand_landmarks:
         for idx, hand_landmarks in enumerate(result.multi_hand_landmarks):
             color = colors[idx % len(colors)]
@@ -127,7 +99,8 @@ while True:
             x_tip = int(tip.x * w)
             y_tip = int(tip.y * h)
 
-            if extended:
+            # Only map hands inside the ROI
+            if x_start <= x_tip <= x_end and y_start <= y_tip <= y_end and extended:
                 cv2.circle(frame, (x_tip, y_tip), 15, color, 3)
 
                 # Clamp to ROI
@@ -140,10 +113,12 @@ while True:
                 screen_x = int(rel_x * screen_w)
                 screen_y = int(rel_y * screen_h)
 
+                # First hand controls cursor
                 if idx == 0:
                     pyautogui.moveTo(screen_x, screen_y)
 
-    cv2.imshow("Hand Tracking - Soft Background ROI", frame)
+    # Display
+    cv2.imshow("Hand Tracking - Full Color ROI", frame)
 
     if cv2.waitKey(1) & 0xFF == 27:
         break
