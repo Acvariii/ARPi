@@ -19,15 +19,15 @@ class MultiHandTracker:
     Runs a background detection thread to keep get_tips() cheap and responsive.
     Smoothing applied per-hand (EMA) and stale hands removed automatically.
     Methods:
-      start() -> start camera & thread
-      stop()  -> stop camera & thread
-      get_tips() -> List[{"screen":(x,y),"roi":(x_tip,y_tip),"hand_idx":i}]
-      get_primary() -> (x,y) or None
+    start() -> start camera & thread
+    stop()  -> stop camera & thread
+    get_tips() -> List[{"screen":(x,y),"roi":(x_tip,y_tip),"hand_idx":i}]
+    get_primary() -> (x,y) or None
     """
     def __init__(self, screen_size: Tuple[int,int]=None, max_hands: int = 8,
-                 detection_conf: float = 0.45, tracking_conf: float = 0.5,
-                 roi_scale: float = 0.95, target_fps: float = 45.0, smoothing: float = 0.6,
-                 socket_path: Optional[str]=None):
+                detection_conf: float = 0.45, tracking_conf: float = 0.5,
+                roi_scale: float = 0.95, target_fps: float = 45.0, smoothing: float = 0.6,
+                socket_path: Optional[str]=None):
         self.screen_w, self.screen_h = screen_size if screen_size else pyautogui.size()
         self.mp_hands = mp.solutions.hands
         self.hands = self.mp_hands.Hands(
