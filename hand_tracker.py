@@ -27,7 +27,9 @@ class MultiHandTracker:
     def __init__(self, screen_size: Tuple[int,int]=None, max_hands: int = 8,
                 detection_conf: float = 0.45, tracking_conf: float = 0.5,
                 roi_scale: float = 0.95, target_fps: float = 45.0, smoothing: float = 0.6,
-                socket_path: Optional[str]=None):
+                socket_path: Optional[str]=None,
+                usb_index: int = 0,
+                prefer_usb: bool = True):
         self.screen_w, self.screen_h = screen_size if screen_size else pyautogui.size()
         self.mp_hands = mp.solutions.hands
         self.hands = self.mp_hands.Hands(
@@ -41,7 +43,10 @@ class MultiHandTracker:
         ]
         self.roi_scale = roi_scale
 
-        self._use_picam = Picamera2 is not None
+        # camera selection prefs
+        self._usb_index = usb_index
+        self._prefer_usb = prefer_usb
+        self._use_picam = (not prefer_usb) and (Picamera2 is not None)
         self._picam = None
         self._cap = None
 
@@ -75,10 +80,36 @@ class MultiHandTracker:
                 self._remote_running = False
                 self._remote_thread = None
                 # fall through to local capture if remote fails
-        if self._use_picam:
+        # Try USB camera first if requested
+        if self._prefer_usb:
+            try:
+                cap = cv2.VideoCapture(self._usb_index)
+                # try to set a modest resolution for speed
+                try:
+                    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+                    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+                    cap.set(cv2.CAP_PROP_FPS, int(min(60, 1.0 / max(0.001, self._target_dt))))
+                except Exception:
+                    pass
+                # verify we can read a frame
+                if cap.isOpened():
+                    ret, _ = cap.read()
+                    if ret:
+                        self._cap = cap
+                        self._use_picam = False
+                    else:
+                        try: cap.release()
+                        except Exception: pass
+                else:
+                    try: cap.release()
+                    except Exception: pass
+            except Exception:
+                self._cap = None
+
+        # If we don't have a working USB capture, try Picamera2 (AI camera)
+        if self._cap is None and Picamera2 is not None:
             try:
                 self._picam = Picamera2()
-                # use a modest, fast configuration; smaller frame -> faster Mediapipe inference
                 try:
                     config = self._picam.create_preview_configuration(main={"size": (800, 600)})
                 except Exception:
@@ -86,7 +117,6 @@ class MultiHandTracker:
                 self._picam.configure(config)
                 try:
                     self._picam.set_controls({
-                        # best-effort autofocus / auto-exposure controls (may be ignored on some sensors)
                         "ExposureTime": 20000,
                         "AnalogueGain": 4.0,
                         "Brightness": 0.3,
@@ -95,24 +125,27 @@ class MultiHandTracker:
                 except Exception:
                     pass
                 self._picam.start()
-                # try a best-effort focus command if supported (not all cameras/PiISP support this)
                 try:
-                    # these keys may not be present; ignore failures
                     self._picam.set_controls({"AfMode": 1})
                 except Exception:
                     pass
+                self._use_picam = True
             except Exception:
                 self._picam = None
                 self._use_picam = False
-        if not self._use_picam:
-            self._cap = cv2.VideoCapture(0)
-            # try to set a modest resolution for speed
+
+        # final fallback: try a default cv2 device (0) if nothing is set
+        if self._cap is None and not self._use_picam:
             try:
-                self._cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-                self._cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-                self._cap.set(cv2.CAP_PROP_FPS, int( min(60, 1.0 / max(0.001, self._target_dt)) ))
+                self._cap = cv2.VideoCapture(0)
+                try:
+                    self._cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+                    self._cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+                    self._cap.set(cv2.CAP_PROP_FPS, int(min(60, 1.0 / max(0.001, self._target_dt))))
+                except Exception:
+                    pass
             except Exception:
-                pass
+                self._cap = None
 
         self._running = True
         # start background thread
