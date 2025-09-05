@@ -11,6 +11,63 @@ import time
 import threading
 from typing import List, Dict, Tuple, Optional
 
+# --- added: simple One Euro filters for smooth, responsive tracking ---
+class _LowPass:
+    def __init__(self, alpha: float = 1.0):
+        self.alpha = alpha
+        self.s = None
+
+    def apply(self, v):
+        if self.s is None:
+            self.s = v
+            return v
+        self.s = self.alpha * v + (1.0 - self.alpha) * self.s
+        return self.s
+
+def _alpha(dt: float, cutoff: float) -> float:
+    r = 2.0 * math.pi * cutoff * dt
+    return r / (r + 1.0) if r > 0.0 else 1.0
+
+class OneEuro1D:
+    """1D One Euro filter (fast, low-latency smoothing)."""
+    def __init__(self, freq=30.0, min_cutoff=1.0, beta=0.0, d_cutoff=1.0):
+        self.freq = max(1e-3, freq)
+        self.min_cutoff = min_cutoff
+        self.beta = beta
+        self.d_cutoff = d_cutoff
+        self.x_prev = None
+        self.dx_prev = None
+        self.last_t = None
+        self._lp_x = _LowPass()
+        self._lp_dx = _LowPass()
+
+    def reset(self):
+        self.x_prev = None
+        self.dx_prev = None
+        self.last_t = None
+        self._lp_x = _LowPass()
+        self._lp_dx = _LowPass()
+
+    def update(self, x, t: float):
+        if self.last_t is None:
+            self.last_t = t
+            self.x_prev = x
+            self.dx_prev = 0.0
+            return x
+        dt = max(1e-3, t - self.last_t)
+        self.last_t = t
+        # derivative
+        dx = (x - self.x_prev) / dt
+        a_d = _alpha(dt, self.d_cutoff)
+        edx = self._lp_dx.apply(a_d * dx + (1 - a_d) * (self.dx_prev if self.dx_prev is not None else dx))
+        # adaptive cutoff
+        cutoff = self.min_cutoff + self.beta * abs(edx)
+        a = _alpha(dt, cutoff)
+        filtered = self._lp_x.apply(a * x + (1 - a) * (self.x_prev if self.x_prev is not None else x))
+        self.x_prev = filtered
+        self.dx_prev = edx
+        return filtered
+
 class MultiHandTracker:
     """
     Lightweight, in-process multi-hand tracker.
@@ -58,7 +115,10 @@ class MultiHandTracker:
         self._last_seen: Dict[int, float] = {}
         self._smoothed: Dict[int, Tuple[int,int]] = {}
         self._smoothed_roi: Dict[int, Tuple[int,int]] = {}
-        self._alpha = smoothing
+        # keep OneEuro filters per-dimension per-hand for better smoothing
+        self._filters_screen: Dict[int, Tuple[OneEuro1D, OneEuro1D]] = {}
+        self._filters_roi: Dict[int, Tuple[OneEuro1D, OneEuro1D]] = {}
+        self._alpha = smoothing  # legacy fallback (not used when filters present)
         self._target_dt = 1.0 / max(5.0, min(target_fps, 60.0))
 
     def start(self):
@@ -232,27 +292,33 @@ class MultiHandTracker:
 
             now = time.time()
             with self._lock:
+                # Use OneEuro filters for smooth, low-latency tracking
                 new_smoothed: Dict[int, Tuple[int,int]] = {}
                 new_smoothed_roi: Dict[int, Tuple[int,int]] = {}
+                freq = 1.0 / max(1e-3, self._target_dt)
                 for t in tips:
                     hid = t["hand_idx"]
-                    cur_screen = t["screen"]
-                    cur_roi = t["roi"]
-                    if hid in self._smoothed:
-                        sx, sy = self._smoothed[hid]
-                        rx, ry = self._smoothed_roi.get(hid, cur_roi)
-                        ax = self._alpha
-                        nx = int(round(ax * sx + (1 - ax) * cur_screen[0]))
-                        ny = int(round(ax * sy + (1 - ax) * cur_screen[1]))
-                        nrx = int(round(ax * rx + (1 - ax) * cur_roi[0]))
-                        nry = int(round(ax * ry + (1 - ax) * cur_roi[1]))
-                        new_smoothed[hid] = (nx, ny)
-                        new_smoothed_roi[hid] = (nrx, nry)
-                    else:
-                        new_smoothed[hid] = (cur_screen[0], cur_screen[1])
-                        new_smoothed_roi[hid] = (cur_roi[0], cur_roi[1])
+                    sx_raw, sy_raw = t["screen"]
+                    rx_raw, ry_raw = t["roi"]
+                    # ensure filters exist
+                    if hid not in self._filters_screen:
+                        # min_cutoff low for smooth, beta > 0 to follow fast moves
+                        self._filters_screen[hid] = (OneEuro1D(freq=freq, min_cutoff=1.0, beta=0.007, d_cutoff=1.0),
+                                                     OneEuro1D(freq=freq, min_cutoff=1.0, beta=0.007, d_cutoff=1.0))
+                    if hid not in self._filters_roi:
+                        self._filters_roi[hid] = (OneEuro1D(freq=freq, min_cutoff=1.5, beta=0.01, d_cutoff=1.0),
+                                                  OneEuro1D(freq=freq, min_cutoff=1.5, beta=0.01, d_cutoff=1.0))
+                    fx, fy = self._filters_screen[hid]
+                    frx, fry = self._filters_roi[hid]
+                    fx_val = int(round(fx.update(sx_raw, now)))
+                    fy_val = int(round(fy.update(sy_raw, now)))
+                    frx_val = int(round(frx.update(rx_raw, now)))
+                    fry_val = int(round(fry.update(ry_raw, now)))
+                    new_smoothed[hid] = (fx_val, fy_val)
+                    new_smoothed_roi[hid] = (frx_val, fry_val)
                     self._last_seen[hid] = now
 
+                # keep recent ones briefly to avoid flicker
                 for hid, (sx, sy) in list(self._smoothed.items()):
                     if hid not in new_smoothed:
                         age = now - self._last_seen.get(hid, 0)
