@@ -30,7 +30,7 @@ def _alpha(dt: float, cutoff: float) -> float:
 
 class OneEuro1D:
     """1D One Euro filter (fast, low-latency smoothing)."""
-    def __init__(self, freq=30.0, min_cutoff=1.0, beta=0.0, d_cutoff=1.0):
+    def __init__(self, freq=60.0, min_cutoff=1.0, beta=0.0, d_cutoff=1.0):
         self.freq = max(1e-3, freq)
         self.min_cutoff = min_cutoff
         self.beta = beta
@@ -130,8 +130,8 @@ class MultiHandTracker:
             try:
                 cap = cv2.VideoCapture(self._usb_index)
                 try:
-                    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
-                    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+                    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+                    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
                     cap.set(cv2.CAP_PROP_FPS, int(min(60, 1.0 / max(0.001, self._target_dt))))
                 except Exception:
                     pass
