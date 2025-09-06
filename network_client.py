@@ -103,6 +103,7 @@ class RemoteCameraClient:
         import websockets
         try:
             async with websockets.connect(self.server_uri, max_size=10_000_000) as ws:
+                print(f"network_client: connected to {self.server_uri}")
                 interval = 1.0 / max(1, self._fps)
                 while self._running:
                     # capture
@@ -119,25 +120,39 @@ class RemoteCameraClient:
                     if frame is None:
                         await asyncio.sleep(interval)
                         continue
+
                     # encode JPEG
-                    _, jpg = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), JPEG_QUALITY])
                     try:
+                        _, jpg = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), JPEG_QUALITY])
                         await ws.send(jpg.tobytes())
-                    except Exception:
+                    except Exception as e:
+                        print(f"network_client: send error: {e}")
                         break
-                    # receive JSON tips (non-blocking style)
+
+                    # try to read a single JSON reply quickly (low timeout for responsiveness)
                     try:
-                        resp = await asyncio.wait_for(ws.recv(), timeout=0.25)
+                        resp = await asyncio.wait_for(ws.recv(), timeout=0.05)
+                        # server sends JSON text
+                        if isinstance(resp, (bytes, bytearray)):
+                            resp = resp.decode('utf-8', errors='ignore')
                         data = json.loads(resp)
+                        tips = data.get("tips", [])
                         with self._lock:
-                            self._latest_tips = data.get("tips", [])
+                            self._latest_tips = tips
+                        # debug log - helps verify server -> client tip flow
+                        if tips:
+                            print(f"network_client: received {len(tips)} tips, first screen={tips[0].get('screen')}")
                     except asyncio.TimeoutError:
+                        # no reply this frame, that's ok - continue to next capture
                         pass
-                    except Exception:
+                    except Exception as e:
+                        print(f"network_client: recv error: {e}")
                         break
+
+                    # pace the loop to target FPS
                     await asyncio.sleep(interval)
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"network_client: connection failed: {e}")
 
     def get_tips(self):
         with self._lock:
