@@ -239,7 +239,7 @@ def show_game_player_selection(screen, game, video_manager=None, hand_tracker=No
 
         pygame.display.flip()
         clock = pygame.time.Clock()
-        clock.tick(60)
+        clock.tick(30)
 
 # Make sure the function is available for import
 if __name__ != "__main__":

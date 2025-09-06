@@ -162,6 +162,7 @@ def perform_dice_roll(screen, player, players, current_player_idx, player_positi
     for _ in range(total):
         start_idx = player.position; end_idx = (player.position + 1) % 40
         sx, sy = centers40[start_idx]; ex, ey = centers40[end_idx]
+        # animation loop per-tile
         t0 = time.time()
         while True:
             t = time.time() - t0
@@ -170,7 +171,8 @@ def perform_dice_roll(screen, player, players, current_player_idx, player_positi
             ix = sx + (ex - sx) * p; iy = sy + (ey - sy) * p
             jump = math.sin(p * math.pi) * 12
             draw_scene_skip(moving_idx=current_player_idx, moving_pos_override=(ix, iy - jump), dice_vals=(d1, d2), dice_offset=(0,0), dice_size=160)
-            pygame.display.flip(); fps_clock.tick(60)
+            pygame.display.flip()
+            fps_clock.tick(30)
         player.position = end_idx
         if player.position == 0:
             player.money += 200
@@ -558,6 +560,6 @@ def run_monopoly_game(screen, num_players, video_manager=None, hand_tracker=None
             exit_hover_start = None
 
         pygame.display.flip()
-        clock.tick(60)
+        clock.tick(30)
 
     return True

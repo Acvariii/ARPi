@@ -132,7 +132,7 @@ class MultiHandTracker:
                 try:
                     cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
                     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-                    cap.set(cv2.CAP_PROP_FPS, int(min(60, 1.0 / max(0.001, self._target_dt))))
+                    cap.set(cv2.CAP_PROP_FPS, int(min(30, 1.0 / max(0.001, self._target_dt))))
                 except Exception:
                     pass
                 if cap.isOpened():
@@ -184,7 +184,7 @@ class MultiHandTracker:
                 try:
                     self._cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
                     self._cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-                    self._cap.set(cv2.CAP_PROP_FPS, int(min(60, 1.0 / max(0.001, self._target_dt))))
+                    self._cap.set(cv2.CAP_PROP_FPS, int(min(30, 1.0 / max(0.001, self._target_dt))))
                 except Exception:
                     pass
             except Exception:
@@ -372,3 +372,19 @@ class MultiHandTracker:
         if not tips:
             return None
         return tips[0]["screen"]
+
+# Initialize hand tracker (start immediately) with higher refresh + smoother rendering
+# prefer lower smoothing (more responsive), higher target_fps; tune to your Pi5 performance
+# Projector resolution is fixed: map camera tips into projector coordinates (1920x1080).
+hand_tracker = MultiHandTracker(
+    screen_size=(1920, 1080),   # fixed projector mapping
+    max_hands=8,
+    smoothing=0.60,
+    target_fps=30,
+    roi_scale=0.98
+)
+try:
+    hand_tracker.start()
+except Exception:
+    # ensure app still runs if camera unavailable
+    pass

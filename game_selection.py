@@ -123,6 +123,6 @@ def show_game_selection(screen, video_manager=None, hand_tracker=None):
         screen.blit(instructions, (screen.get_width() // 2 - instructions.get_width() // 2, screen.get_height() - 80))
 
         pygame.display.flip()
-        clock.tick(60)
+        clock.tick(30)
 
     return True
