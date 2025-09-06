@@ -37,10 +37,16 @@ class RemoteCameraClient:
                 ret, _ = cap.read()
                 if ret:
                     self._cap = cap
+                    print("network_client: using USB camera (index {})".format(self.usb_index))
                     return
-                cap.release()
-            except Exception:
+                else:
+                    try: cap.release()
+                    except Exception: pass
+                    print("network_client: USB camera not available/failed initial read")
+            except Exception as e:
+                print(f"network_client: USB open error: {e}")
                 self._cap = None
+
         # fallback to Picamera2
         if Picamera2 is not None:
             try:
@@ -51,13 +57,22 @@ class RemoteCameraClient:
                     cfg = self._picam.create_preview_configuration(main={"size": (640,480)})
                 self._picam.configure(cfg)
                 self._picam.start()
+                print("network_client: using Picamera2")
                 return
-            except Exception:
+            except Exception as e:
+                print(f"network_client: Picamera2 open error: {e}")
                 self._picam = None
+
         # final fallback: default cv device 0
         try:
             self._cap = cv2.VideoCapture(0)
-        except Exception:
+            ret, _ = self._cap.read()
+            if ret:
+                print("network_client: using fallback OpenCV device 0")
+            else:
+                print("network_client: fallback OpenCV device 0 failed initial read")
+        except Exception as e:
+            print(f"network_client: fallback camera error: {e}")
             self._cap = None
 
     def start(self):
