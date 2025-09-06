@@ -4,6 +4,7 @@ import os
 from constants import init_fonts
 from video_manager import VideoManager
 from hand_tracker import MultiHandTracker
+from network_client import RemoteCameraClient
 
 def main():
     """Main function to initialize and run the game selector"""
@@ -47,6 +48,9 @@ def main():
         # ensure app still runs if camera unavailable
         pass
 
+    net_client = RemoteCameraClient(server_uri="ws://192.168.1.79:8765")
+    net_client.start()
+
     # Run the game selection screen
     try:
         running = show_game_selection(screen, video_manager if video_loaded else None, hand_tracker=hand_tracker)
@@ -60,6 +64,7 @@ def main():
         pygame.quit()
     if not running:
         sys.exit()
+    net_client.stop()
 
 if __name__ == "__main__":
     main()
