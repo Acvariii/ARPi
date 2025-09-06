@@ -158,6 +158,20 @@ class RemoteCameraClient:
         with self._lock:
             return list(self._latest_tips)
 
+    def get_primary(self):
+        """Return first tip 'screen' coords or None (compatible with MultiHandTracker API)."""
+        tips = self.get_tips()
+        if not tips:
+            return None
+        pos = tips[0].get("screen")
+        if pos is None:
+            return None
+        # ensure tuple of ints
+        try:
+            return (int(pos[0]), int(pos[1]))
+        except Exception:
+            return None
+
 # usage:
 # client = RemoteCameraClient(server_uri="ws://192.168.1.10:8765")
 # client.start()
