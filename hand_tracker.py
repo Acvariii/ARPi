@@ -82,7 +82,7 @@ class MultiHandTracker:
                  detection_conf: float = 0.45,
                  tracking_conf: float = 0.5,
                  roi_scale: float = 0.95,
-                 target_fps: float = 30.0,
+                 target_fps: float = 60.0,
                  smoothing: float = 0.6,
                  usb_index: int = 0,
                  prefer_usb: bool = True):
@@ -132,7 +132,7 @@ class MultiHandTracker:
                 try:
                     cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
                     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-                    cap.set(cv2.CAP_PROP_FPS, int(min(30, 1.0 / max(0.001, self._target_dt))))
+                    cap.set(cv2.CAP_PROP_FPS, int(min(60, 1.0 / max(0.001, self._target_dt))))
                 except Exception:
                     pass
                 if cap.isOpened():
@@ -184,7 +184,7 @@ class MultiHandTracker:
                 try:
                     self._cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
                     self._cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-                    self._cap.set(cv2.CAP_PROP_FPS, int(min(30, 1.0 / max(0.001, self._target_dt))))
+                    self._cap.set(cv2.CAP_PROP_FPS, int(min(60, 1.0 / max(0.001, self._target_dt))))
                 except Exception:
                     pass
             except Exception:

@@ -121,7 +121,7 @@ def perform_dice_roll(screen, player, players, current_player_idx, player_positi
         wobble_y = int(math.cos((time.time()-t0)*10) * 6)
         draw_scene_skip(dice_vals=(rd1, rd2), dice_offset=(wobble_x, wobble_y), dice_size=160)
         pygame.display.flip()
-        fps_clock.tick(30)
+        fps_clock.tick(60)
 
     # final dice
     d1 = random.randint(1,6); d2 = random.randint(1,6)
@@ -139,7 +139,7 @@ def perform_dice_roll(screen, player, players, current_player_idx, player_positi
         t1 = time.time()
         while time.time() - t1 < final_show_time:
             draw_scene_skip(dice_vals=(d1, d2), dice_offset=(0,0), dice_size=180)
-            pygame.display.flip(); fps_clock.tick(30)
+            pygame.display.flip(); fps_clock.tick(60)
         return True, {"type":"jail","reason":"three_doubles"}
 
     # show final for a short moment so player sees outcome
@@ -147,7 +147,7 @@ def perform_dice_roll(screen, player, players, current_player_idx, player_positi
     t1 = time.time()
     while time.time() - t1 < final_show_time:
         draw_scene_skip(dice_vals=(d1, d2), dice_offset=(0,0), dice_size=180)
-        pygame.display.flip(); fps_clock.tick(30)
+        pygame.display.flip(); fps_clock.tick(60)
 
     total = d1 + d2
 
@@ -172,7 +172,7 @@ def perform_dice_roll(screen, player, players, current_player_idx, player_positi
             jump = math.sin(p * math.pi) * 12
             draw_scene_skip(moving_idx=current_player_idx, moving_pos_override=(ix, iy - jump), dice_vals=(d1, d2), dice_offset=(0,0), dice_size=160)
             pygame.display.flip()
-            fps_clock.tick(30)
+            fps_clock.tick(60)
         player.position = end_idx
         if player.position == 0:
             player.money += 200
@@ -560,6 +560,6 @@ def run_monopoly_game(screen, num_players, video_manager=None, hand_tracker=None
             exit_hover_start = None
 
         pygame.display.flip()
-        clock.tick(30)
+        clock.tick(60)
 
     return True

@@ -11,7 +11,7 @@ except Exception:
 
 SERVER_URI = "ws://192.168.1.79:8765"  # << replace with your Windows IP
 JPEG_QUALITY = 70
-FPS = 30.0
+FPS = 60.0
 
 class RemoteCameraClient:
     def __init__(self, server_uri=SERVER_URI, usb_index=0, prefer_usb=True, fps=FPS):
