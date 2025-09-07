@@ -34,8 +34,8 @@ class RemoteCameraClient:
         try:
             cap = cv2.VideoCapture(self.usb_index)
             try:
-                cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-                cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+                cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+                cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
                 cap.set(cv2.CAP_PROP_FPS, int(self._fps))
             except Exception:
                 pass
@@ -64,9 +64,9 @@ class RemoteCameraClient:
         try:
             cap0 = cv2.VideoCapture(0)
             try:
-                cap0.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-                cap0.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-                cap0.set(cv2.CAP_PROP_FPS, int(self._fps))
+                cap0.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+                cap0.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+                cap0.set(cv2.CAP_PROP_FPS, int(self._fps)) 
             except Exception:
                 pass
             found0 = False
