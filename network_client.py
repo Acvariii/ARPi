@@ -30,7 +30,7 @@ class RemoteCameraClient:
         self._fps = fps
 
     def _open_camera(self):
-        # 1) Try configured USB index first (usb_index)
+        # 1) Try configured USB index first (usb_index) with a few read attempts (some devices need time)
         try:
             cap = cv2.VideoCapture(self.usb_index)
             try:
@@ -39,8 +39,14 @@ class RemoteCameraClient:
                 cap.set(cv2.CAP_PROP_FPS, int(self._fps))
             except Exception:
                 pass
-            ret, _ = cap.read()
-            if ret:
+            found = False
+            for attempt in range(3):
+                ret, _ = cap.read()
+                if ret:
+                    found = True
+                    break
+                time.sleep(0.06)
+            if found:
                 self._cap = cap
                 print(f"network_client: using USB camera (index {self.usb_index})")
                 return
@@ -54,7 +60,7 @@ class RemoteCameraClient:
             print(f"network_client: USB open error for index {self.usb_index}: {e}")
             self._cap = None
 
-        # 2) Try explicit OpenCV device 0 as second USB candidate
+        # 2) Try explicit OpenCV device 0 as second USB candidate (also retry)
         try:
             cap0 = cv2.VideoCapture(0)
             try:
@@ -63,8 +69,14 @@ class RemoteCameraClient:
                 cap0.set(cv2.CAP_PROP_FPS, int(self._fps))
             except Exception:
                 pass
-            ret0, _ = cap0.read()
-            if ret0:
+            found0 = False
+            for attempt in range(3):
+                ret0, _ = cap0.read()
+                if ret0:
+                    found0 = True
+                    break
+                time.sleep(0.06)
+            if found0:
                 self._cap = cap0
                 print("network_client: using OpenCV device 0")
                 return

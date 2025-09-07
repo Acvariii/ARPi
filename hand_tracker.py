@@ -125,7 +125,7 @@ class MultiHandTracker:
         if self._running:
             return
 
-        # 1) try configured USB index first
+        # 1) try configured USB index first with retries
         try:
             cap = cv2.VideoCapture(self._usb_index)
             try:
@@ -134,21 +134,24 @@ class MultiHandTracker:
                 cap.set(cv2.CAP_PROP_FPS, int(min(60, 1.0 / max(0.001, self._target_dt))))
             except Exception:
                 pass
+            found = False
             if cap.isOpened():
-                ret, _ = cap.read()
-                if ret:
-                    self._cap = cap
-                    self._use_picam = False
-                else:
-                    try: cap.release()
-                    except Exception: pass
+                for _ in range(3):
+                    ret, _ = cap.read()
+                    if ret:
+                        found = True
+                        break
+                    time.sleep(0.06)
+            if found:
+                self._cap = cap
+                self._use_picam = False
             else:
                 try: cap.release()
                 except Exception: pass
         except Exception:
             self._cap = None
 
-        # 2) try explicit OpenCV device 0 as second USB candidate
+        # 2) try explicit OpenCV device 0 as second USB candidate (with retries)
         if self._cap is None:
             try:
                 cap0 = cv2.VideoCapture(0)
@@ -158,14 +161,17 @@ class MultiHandTracker:
                     cap0.set(cv2.CAP_PROP_FPS, int(min(60, 1.0 / max(0.001, self._target_dt))))
                 except Exception:
                     pass
+                found0 = False
                 if cap0.isOpened():
-                    ret0, _ = cap0.read()
-                    if ret0:
-                        self._cap = cap0
-                        self._use_picam = False
-                    else:
-                        try: cap0.release()
-                        except Exception: pass
+                    for _ in range(3):
+                        ret0, _ = cap0.read()
+                        if ret0:
+                            found0 = True
+                            break
+                        time.sleep(0.06)
+                if found0:
+                    self._cap = cap0
+                    self._use_picam = False
                 else:
                     try: cap0.release()
                     except Exception: pass

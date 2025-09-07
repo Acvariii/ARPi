@@ -72,11 +72,29 @@ def main(socket_path=SOCKET_PATH, target_fps=TARGET_FPS):
             print("camera_service: using Picamera2 (fallback)")
         except Exception:
             picam = None
-    if not picam:
-        cap = cv2.VideoCapture(0)
-        cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-        cap.set(cv2.CAP_PROP_FPS, int(target_fps))
+    # only use explicit device 0 if we still have no capture device and no Picamera
+    if cap is None and picam is None:
+        try:
+            cap = cv2.VideoCapture(0)
+            cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+            cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+            cap.set(cv2.CAP_PROP_FPS, int(target_fps))
+            # quick read checks (some USB cameras need a few frames)
+            ok = False
+            for _ in range(3):
+                ret, _ = cap.read()
+                if ret:
+                    ok = True
+                    break
+                time.sleep(0.06)
+            if ok:
+                print("camera_service: using fallback OpenCV device 0")
+            else:
+                try: cap.release()
+                except Exception: pass
+                cap = None
+        except Exception:
+            cap = None
 
     # create unix socket and listen for one client
     server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
