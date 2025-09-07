@@ -37,8 +37,8 @@ def main(socket_path=SOCKET_PATH, target_fps=TARGET_FPS):
         try:
             cap_try = cv2.VideoCapture(idx)
             try:
-                cap_try.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-                cap_try.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+                cap_try.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+                cap_try.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
                 cap_try.set(cv2.CAP_PROP_FPS, int(target_fps))
             except Exception:
                 pass
@@ -76,8 +76,8 @@ def main(socket_path=SOCKET_PATH, target_fps=TARGET_FPS):
     if cap is None and picam is None:
         try:
             cap = cv2.VideoCapture(0)
-            cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-            cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+            cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+            cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
             cap.set(cv2.CAP_PROP_FPS, int(target_fps))
             # quick read checks (some USB cameras need a few frames)
             ok = False
