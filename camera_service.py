@@ -12,6 +12,8 @@ try:
 except Exception:
     Picamera2 = None
 
+from constants import CAPTURE_WIDTH, CAPTURE_HEIGHT, CAPTURE_ASPECT
+
 SOCKET_PATH = "/tmp/hand_tracker.sock"
 TARGET_FPS = 60.0
 ROI_SCALE = 0.95
@@ -148,7 +150,13 @@ def main(socket_path=SOCKET_PATH, target_fps=TARGET_FPS):
             except Exception:
                 pass
 
-            h, w = frame.shape[:2]
+            # enforce 16:9 for consistent mapping
+            try:
+                frame = _ensure_16_9_server(frame, CAPTURE_WIDTH, CAPTURE_HEIGHT)
+                h, w = frame.shape[:2]
+            except Exception:
+                h, w = frame.shape[:2]
+
             roi_w = int(w * ROI_SCALE)
             roi_h = int(roi_w * 9 / 16)
             x_start = (w - roi_w) // 2
@@ -206,6 +214,25 @@ def main(socket_path=SOCKET_PATH, target_fps=TARGET_FPS):
         if cap:
             try: cap.release()
             except Exception: pass
+
+def _ensure_16_9_server(frame, target_w=CAPTURE_WIDTH, target_h=CAPTURE_HEIGHT):
+    try:
+        h, w = frame.shape[:2]
+        target_ar = target_w / max(1, target_h)
+        cur_ar = w / max(1, h)
+        if abs(cur_ar - target_ar) < 1e-6:
+            return cv2.resize(frame, (target_w, target_h), interpolation=cv2.INTER_LINEAR)
+        if cur_ar > target_ar:
+            new_w = int(h * target_ar)
+            x0 = (w - new_w) // 2
+            cropped = frame[:, x0:x0 + new_w]
+        else:
+            new_h = int(w / target_ar)
+            y0 = (h - new_h) // 2
+            cropped = frame[y0:y0 + new_h, :]
+        return cv2.resize(cropped, (target_w, target_h), interpolation=cv2.INTER_LINEAR)
+    except Exception:
+        return cv2.resize(frame, (target_w, target_h), interpolation=cv2.INTER_LINEAR)
 
 if __name__ == "__main__":
     main()

@@ -5,6 +5,7 @@ import time
 import cv2
 import numpy as np
 import pygame
+from constants import CAPTURE_WIDTH, CAPTURE_HEIGHT, CAPTURE_ASPECT
 try:
     from picamera2 import Picamera2
 except Exception:
@@ -133,6 +134,30 @@ class RemoteCameraClient:
             except Exception: pass
             self._cap = None
 
+    def _ensure_16_9(frame, target_w=CAPTURE_WIDTH, target_h=CAPTURE_HEIGHT):
+        """Center-crop or pad to target 16:9 and resize to exact target size."""
+        try:
+            h, w = frame.shape[:2]
+            target_ar = target_w / max(1, target_h)
+            cur_ar = w / max(1, h)
+            if abs(cur_ar - target_ar) < 1e-6:
+                out = cv2.resize(frame, (target_w, target_h), interpolation=cv2.INTER_LINEAR)
+                return out
+            if cur_ar > target_ar:
+                # too wide -> crop width
+                new_w = int(h * target_ar)
+                x0 = (w - new_w) // 2
+                cropped = frame[:, x0:x0 + new_w]
+            else:
+                # too tall -> crop height
+                new_h = int(w / target_ar)
+                y0 = (h - new_h) // 2
+                cropped = frame[y0:y0 + new_h, :]
+            out = cv2.resize(cropped, (target_w, target_h), interpolation=cv2.INTER_LINEAR)
+            return out
+        except Exception:
+            return cv2.resize(frame, (target_w, target_h), interpolation=cv2.INTER_LINEAR)
+
     async def _run_loop(self):
         import websockets
         try:
@@ -190,6 +215,12 @@ class RemoteCameraClient:
                     if frame is None:
                         await asyncio.sleep(interval)
                         continue
+
+                    # ensure consistent 16:9 capture before any resize/send
+                    try:
+                        frame = _ensure_16_9(frame, CAPTURE_WIDTH, CAPTURE_HEIGHT)
+                    except Exception:
+                        pass
 
                     # Resize down (preserve aspect) to reduce network + server load
                     try:

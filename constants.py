@@ -1,4 +1,3 @@
-# ...existing code...
 # Game constants
 import pygame
 
@@ -125,3 +124,7 @@ GAMES = [
 PROPERTY_SPACE_INDICES = [
     1, 3, 6, 8, 9, 11, 13, 14, 16, 18, 19, 21, 23, 24, 26, 27, 29, 31, 32, 34, 37, 39
 ]
+
+CAPTURE_WIDTH = 1280
+CAPTURE_HEIGHT = 720
+CAPTURE_ASPECT = CAPTURE_WIDTH / max(1, CAPTURE_HEIGHT)

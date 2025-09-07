@@ -10,6 +10,7 @@ import pyautogui
 import time
 import threading
 from typing import List, Dict, Tuple, Optional
+from constants import CAPTURE_WIDTH, CAPTURE_HEIGHT, CAPTURE_ASPECT
 
 # --- added: simple One Euro filters for smooth, responsive tracking ---
 class _LowPass:
@@ -248,10 +249,29 @@ class MultiHandTracker:
     def _distance_coords(a, b) -> float:
         return math.hypot(a[0]-b[0], a[1]-b[1])
 
+def _ensure_16_9_local(frame, target_w=CAPTURE_WIDTH, target_h=CAPTURE_HEIGHT):
+    try:
+        h, w = frame.shape[:2]
+        target_ar = target_w / max(1, target_h)
+        cur_ar = w / max(1, h)
+        if abs(cur_ar - target_ar) < 1e-6:
+            return cv2.resize(frame, (target_w, target_h), interpolation=cv2.INTER_LINEAR)
+        if cur_ar > target_ar:
+            new_w = int(h * target_ar)
+            x0 = (w - new_w) // 2
+            cropped = frame[:, x0:x0 + new_w]
+        else:
+            new_h = int(w / target_ar)
+            y0 = (h - new_h) // 2
+            cropped = frame[y0:y0 + new_h, :]
+        return cv2.resize(cropped, (target_w, target_h), interpolation=cv2.INTER_LINEAR)
+    except Exception:
+        return cv2.resize(frame, (target_w, target_h), interpolation=cv2.INTER_LINEAR)
+
     def _capture_frame(self) -> Optional[np.ndarray]:
         if self._picam:
             try:
-                return self._picam.capture_array()
+                frame = self._picam.capture_array()
             except Exception:
                 return None
         if self._cap:
@@ -263,8 +283,14 @@ class MultiHandTracker:
                 except Exception:
                     pass
                 return None
-            return frame
-        return None
+        if frame is None:
+            return None
+        # ensure 16:9 center-crop/resize before processing
+        try:
+            frame = _ensure_16_9_local(frame, CAPTURE_WIDTH, CAPTURE_HEIGHT)
+        except Exception:
+            pass
+        return frame
 
     def _worker(self):
         """Capture + MediaPipe processing loop."""
