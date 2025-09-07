@@ -17,7 +17,7 @@ mp_hands = mp.solutions.hands
 # Keep min_detection_confidence/tracking_confidence the same to preserve behaviour.
 hands = mp_hands.Hands(
     max_num_hands=8,
-    model_complexity=0,
+    model_complexity=1,
     min_detection_confidence=0.45,
     min_tracking_confidence=0.5
 )

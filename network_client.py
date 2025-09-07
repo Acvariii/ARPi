@@ -30,27 +30,31 @@ class RemoteCameraClient:
         self._fps = fps
 
     def _open_camera(self):
-        # try USB first
-        if self.prefer_usb:
+        # Always try USB OpenCV device first (even if Picamera2 is available).
+        try:
+            cap = cv2.VideoCapture(self.usb_index)
             try:
-                cap = cv2.VideoCapture(self.usb_index)
                 cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
                 cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
                 cap.set(cv2.CAP_PROP_FPS, int(self._fps))
-                ret, _ = cap.read()
-                if ret:
-                    self._cap = cap
-                    print("network_client: using USB camera (index {})".format(self.usb_index))
-                    return
-                else:
-                    try: cap.release()
-                    except Exception: pass
-                    print("network_client: USB camera not available/failed initial read")
-            except Exception as e:
-                print(f"network_client: USB open error: {e}")
-                self._cap = None
+            except Exception:
+                pass
+            ret, _ = cap.read()
+            if ret:
+                self._cap = cap
+                print("network_client: using USB camera (index {})".format(self.usb_index))
+                return
+            else:
+                try:
+                    cap.release()
+                except Exception:
+                    pass
+                print("network_client: USB camera not available/failed initial read")
+        except Exception as e:
+            print(f"network_client: USB open error: {e}")
+            self._cap = None
 
-        # fallback to Picamera2
+        # If no USB camera, try Picamera2 (Raspberry Pi camera) as fallback
         if Picamera2 is not None:
             try:
                 self._picam = Picamera2()
@@ -66,7 +70,7 @@ class RemoteCameraClient:
                 print(f"network_client: Picamera2 open error: {e}")
                 self._picam = None
 
-        # final fallback: default cv device 0
+        # final fallback: try default OpenCV device 0
         try:
             self._cap = cv2.VideoCapture(0)
             ret, _ = self._cap.read()

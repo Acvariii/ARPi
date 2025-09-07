@@ -125,31 +125,34 @@ class MultiHandTracker:
         if self._running:
             return
 
-        # Try USB camera first
-        if self._prefer_usb:
+        # Always try USB OpenCV device first (even if Picamera2 is present)
+        try:
+            cap = cv2.VideoCapture(self._usb_index)
             try:
-                cap = cv2.VideoCapture(self._usb_index)
+                cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+                cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+                cap.set(cv2.CAP_PROP_FPS, int(min(60, 1.0 / max(0.001, self._target_dt))))
+            except Exception:
+                pass
+            if cap.isOpened():
+                ret, _ = cap.read()
+                if ret:
+                    self._cap = cap
+                    self._use_picam = False
+                else:
+                    try:
+                        cap.release()
+                    except Exception:
+                        pass
+            else:
                 try:
-                    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-                    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-                    cap.set(cv2.CAP_PROP_FPS, int(min(60, 1.0 / max(0.001, self._target_dt))))
+                    cap.release()
                 except Exception:
                     pass
-                if cap.isOpened():
-                    ret, _ = cap.read()
-                    if ret:
-                        self._cap = cap
-                        self._use_picam = False
-                    else:
-                        try: cap.release()
-                        except Exception: pass
-                else:
-                    try: cap.release()
-                    except Exception: pass
-            except Exception:
-                self._cap = None
+        except Exception:
+            self._cap = None
 
-        # Fall back to Picamera2 (AI camera)
+        # If no USB camera opened, fall back to Picamera2 (Raspberry Pi camera)
         if self._cap is None and Picamera2 is not None:
             try:
                 self._picam = Picamera2()
