@@ -105,8 +105,37 @@ class RemoteCameraClient:
             async with websockets.connect(self.server_uri, max_size=10_000_000) as ws:
                 print(f"network_client: connected to {self.server_uri}")
                 interval = 1.0 / max(1, self._fps)
+
+                # receiver task: continuously read server messages and update tips immediately
+                async def _recv_loop():
+                    try:
+                        while self._running:
+                            msg = await ws.recv()
+                            if isinstance(msg, (bytes, bytearray)):
+                                try:
+                                    text = msg.decode('utf-8', errors='ignore')
+                                    data = json.loads(text)
+                                except Exception:
+                                    continue
+                            else:
+                                try:
+                                    data = json.loads(msg)
+                                except Exception:
+                                    continue
+                            tips = data.get("tips", [])
+                            with self._lock:
+                                self._latest_tips = tips
+                            if tips:
+                                # debug log - helps verify server -> client tip flow
+                                print(f"network_client: received {len(tips)} tips, first screen={tips[0].get('screen')}")
+                    except Exception as e:
+                        # receiver exiting (connection closed or error)
+                        print(f"network_client: recv loop ended: {e}")
+
+                recv_task = asyncio.create_task(_recv_loop())
+
+                # sender loop: capture frames and send continuously, does not wait for replies
                 while self._running:
-                    # capture
                     frame = None
                     if self._picam:
                         try:
@@ -121,7 +150,7 @@ class RemoteCameraClient:
                         await asyncio.sleep(interval)
                         continue
 
-                    # encode JPEG
+                    # encode JPEG and send (best-effort)
                     try:
                         _, jpg = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), JPEG_QUALITY])
                         await ws.send(jpg.tobytes())
@@ -129,28 +158,16 @@ class RemoteCameraClient:
                         print(f"network_client: send error: {e}")
                         break
 
-                    # try to read a single JSON reply quickly (low timeout for responsiveness)
-                    try:
-                        resp = await asyncio.wait_for(ws.recv(), timeout=0.05)
-                        # server sends JSON text
-                        if isinstance(resp, (bytes, bytearray)):
-                            resp = resp.decode('utf-8', errors='ignore')
-                        data = json.loads(resp)
-                        tips = data.get("tips", [])
-                        with self._lock:
-                            self._latest_tips = tips
-                        # debug log - helps verify server -> client tip flow
-                        if tips:
-                            print(f"network_client: received {len(tips)} tips, first screen={tips[0].get('screen')}")
-                    except asyncio.TimeoutError:
-                        # no reply this frame, that's ok - continue to next capture
-                        pass
-                    except Exception as e:
-                        print(f"network_client: recv error: {e}")
-                        break
-
                     # pace the loop to target FPS
                     await asyncio.sleep(interval)
+
+                # clean up receiver if still running
+                if not recv_task.done():
+                    recv_task.cancel()
+                    try:
+                        await recv_task
+                    except Exception:
+                        pass
         except Exception as e:
             print(f"network_client: connection failed: {e}")
 
