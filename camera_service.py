@@ -163,6 +163,25 @@ def main(socket_path=SOCKET_PATH, target_fps=TARGET_FPS):
             y_start = (h - roi_h) // 2
             x_end = x_start + roi_w
             y_end = y_start + roi_h
+            # --- Preview: draw ROI and center crosshair for debugging/visual feedback ---
+            try:
+                win_name = "camera_service_preview"
+                # create window once; harmless if already exists
+                cv2.namedWindow(win_name, cv2.WINDOW_NORMAL)
+                preview = frame.copy()
+                # ROI rectangle (blue)
+                cv2.rectangle(preview, (x_start, y_start), (x_end, y_end), (255, 0, 0), 2)
+                # center crosshair inside ROI
+                cx = x_start + roi_w // 2
+                cy = y_start + roi_h // 2
+                cv2.line(preview, (cx - 20, cy), (cx + 20, cy), (255, 0, 0), 1)
+                cv2.line(preview, (cx, cy - 20), (cx, cy + 20), (255, 0, 0), 1)
+                cv2.putText(preview, "ROI", (x_start + 8, y_start + 28),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 0, 0), 2, cv2.LINE_AA)
+                cv2.imshow(win_name, preview)
+                cv2.waitKey(1)
+            except Exception:
+                pass
 
             rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             try:
@@ -214,6 +233,11 @@ def main(socket_path=SOCKET_PATH, target_fps=TARGET_FPS):
         if cap:
             try: cap.release()
             except Exception: pass
+        # close preview window if open
+        try:
+            cv2.destroyAllWindows()
+        except Exception:
+            pass
 
 def _ensure_16_9_server(frame, target_w=CAPTURE_WIDTH, target_h=CAPTURE_HEIGHT):
     try:
