@@ -13,7 +13,7 @@ except Exception:
     Picamera2 = None
 
 SOCKET_PATH = "/tmp/hand_tracker.sock"
-TARGET_FPS = 25.0
+TARGET_FPS = 60.0
 ROI_SCALE = 0.98
 DETECTION_CONF = 0.45
 TRACKING_CONF = 0.5

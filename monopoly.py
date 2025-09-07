@@ -516,8 +516,18 @@ def run_monopoly_game(screen, num_players, video_manager=None, hand_tracker=None
             mouse_pos = (active_assignment[0], active_assignment[1])
             active_hand_idx = active_assignment[2]
         else:
-            mouse_pos = pygame.mouse.get_pos()
-            active_hand_idx = None
+            # fallback: prefer the latest remote tip (real-time) as the pointer,
+            # then hand_tracker.get_tips(), and finally the system mouse.
+            if last_remote_tips:
+                try:
+                    first = last_remote_tips[0]
+                    tp = first.get("screen")
+                    mouse_pos = (int(tp[0]), int(tp[1])) if tp else pygame.mouse.get_pos()
+                    active_hand_idx = first.get("hand_idx")
+                except Exception:
+                    mouse_pos = pygame.mouse.get_pos(); active_hand_idx = None
+            else:
+                mouse_pos = pygame.mouse.get_pos(); active_hand_idx = None
 
         current_time = time.time()
 
