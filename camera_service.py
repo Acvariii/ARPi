@@ -29,59 +29,49 @@ def main(socket_path=SOCKET_PATH, target_fps=TARGET_FPS):
     mp_hands = mp.solutions.hands
     hands = mp_hands.Hands(max_num_hands=8, min_detection_confidence=DETECTION_CONF, min_tracking_confidence=TRACKING_CONF)
 
-    # camera init: try USB OpenCV device first, then Picamera2 if no USB device present
+    # camera init: try USB OpenCV (usb index 1) first, then explicit device 0, then Picamera2 last
     picam = None
     cap = None
-    try:
-        cap = cv2.VideoCapture(0)
+    tried_indices = [1, 0]  # first try a likely USB index (1), then device 0
+    for idx in tried_indices:
         try:
-            cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-            cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-            cap.set(cv2.CAP_PROP_FPS, int(target_fps))
-        except Exception:
-            pass
-        ret, _ = cap.read()
-        if not ret:
+            cap_try = cv2.VideoCapture(idx)
             try:
-                cap.release()
+                cap_try.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+                cap_try.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+                cap_try.set(cv2.CAP_PROP_FPS, int(target_fps))
             except Exception:
                 pass
-            cap = None
-            # try Picamera2 as fallback
-            if Picamera2 is not None:
+            ret, _ = cap_try.read()
+            if ret:
+                cap = cap_try
+                print(f"camera_service: using OpenCV device {idx}")
+                break
+            else:
                 try:
-                    picam = Picamera2()
-                    try:
-                        cfg = picam.create_preview_configuration(main={"size": (800, 600)})
-                    except Exception:
-                        cfg = picam.create_preview_configuration(main={"size": (640, 480)})
-                    picam.configure(cfg)
-                    try:
-                        picam.set_controls({"ExposureTime": 20000, "AnalogueGain": 4.0, "AwbEnable": True})
-                    except Exception:
-                        pass
-                    picam.start()
-                except Exception:
-                    picam = None
-        else:
-            print("camera_service: using OpenCV USB camera")
-    except Exception:
-        cap = None
-        if Picamera2 is not None:
-            try:
-                picam = Picamera2()
-                try:
-                    cfg = picam.create_preview_configuration(main={"size": (800, 600)})
-                except Exception:
-                    cfg = picam.create_preview_configuration(main={"size": (640, 480)})
-                picam.configure(cfg)
-                try:
-                    picam.set_controls({"ExposureTime": 20000, "AnalogueGain": 4.0, "AwbEnable": True})
+                    cap_try.release()
                 except Exception:
                     pass
-                picam.start()
+        except Exception:
+            pass
+
+    # If no OpenCV USB device opened, try Picamera2 as a last fallback
+    if cap is None and Picamera2 is not None:
+        try:
+            picam = Picamera2()
+            try:
+                cfg = picam.create_preview_configuration(main={"size": (800, 600)})
             except Exception:
-                picam = None
+                cfg = picam.create_preview_configuration(main={"size": (640, 480)})
+            picam.configure(cfg)
+            try:
+                picam.set_controls({"ExposureTime": 20000, "AnalogueGain": 4.0, "AwbEnable": True})
+            except Exception:
+                pass
+            picam.start()
+            print("camera_service: using Picamera2 (fallback)")
+        except Exception:
+            picam = None
     if not picam:
         cap = cv2.VideoCapture(0)
         cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)

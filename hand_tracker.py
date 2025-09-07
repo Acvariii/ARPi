@@ -125,7 +125,7 @@ class MultiHandTracker:
         if self._running:
             return
 
-        # Always try USB OpenCV device first (even if Picamera2 is present)
+        # 1) try configured USB index first
         try:
             cap = cv2.VideoCapture(self._usb_index)
             try:
@@ -140,19 +140,39 @@ class MultiHandTracker:
                     self._cap = cap
                     self._use_picam = False
                 else:
-                    try:
-                        cap.release()
-                    except Exception:
-                        pass
+                    try: cap.release()
+                    except Exception: pass
             else:
-                try:
-                    cap.release()
-                except Exception:
-                    pass
+                try: cap.release()
+                except Exception: pass
         except Exception:
             self._cap = None
 
-        # If no USB camera opened, fall back to Picamera2 (Raspberry Pi camera)
+        # 2) try explicit OpenCV device 0 as second USB candidate
+        if self._cap is None:
+            try:
+                cap0 = cv2.VideoCapture(0)
+                try:
+                    cap0.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+                    cap0.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+                    cap0.set(cv2.CAP_PROP_FPS, int(min(60, 1.0 / max(0.001, self._target_dt))))
+                except Exception:
+                    pass
+                if cap0.isOpened():
+                    ret0, _ = cap0.read()
+                    if ret0:
+                        self._cap = cap0
+                        self._use_picam = False
+                    else:
+                        try: cap0.release()
+                        except Exception: pass
+                else:
+                    try: cap0.release()
+                    except Exception: pass
+            except Exception:
+                self._cap = None
+
+        # 3) Picamera2 as last fallback
         if self._cap is None and Picamera2 is not None:
             try:
                 self._picam = Picamera2()
@@ -179,19 +199,6 @@ class MultiHandTracker:
             except Exception:
                 self._picam = None
                 self._use_picam = False
-
-        # Final fallback: default OpenCV device 0
-        if self._cap is None and not self._use_picam:
-            try:
-                self._cap = cv2.VideoCapture(0)
-                try:
-                    self._cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-                    self._cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-                    self._cap.set(cv2.CAP_PROP_FPS, int(min(60, 1.0 / max(0.001, self._target_dt))))
-                except Exception:
-                    pass
-            except Exception:
-                self._cap = None
 
         self._running = True
         self._thread = threading.Thread(target=self._worker, daemon=True)
