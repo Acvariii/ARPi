@@ -14,7 +14,7 @@ SERVER_URI = "ws://192.168.1.79:8765"  # << replace with your Windows IP
 # Lower quality + resize to reduce round-trip time and CPU on server
 JPEG_QUALITY = 60
 FPS = 60.0
-SEND_WIDTH = 640
+SEND_WIDTH = 1280
 
 class RemoteCameraClient:
     def __init__(self, server_uri=SERVER_URI, usb_index=0, prefer_usb=True, fps=FPS):
