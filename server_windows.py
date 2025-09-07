@@ -13,7 +13,14 @@ PORT = 8765
 PROJECTOR_W, PROJECTOR_H = 1920, 1080  # change if needed
 
 mp_hands = mp.solutions.hands
-hands = mp_hands.Hands(max_num_hands=8, min_detection_confidence=0.45, min_tracking_confidence=0.5)
+# Use lower model_complexity for faster, lower-latency inference on the Windows server.
+# Keep min_detection_confidence/tracking_confidence the same to preserve behaviour.
+hands = mp_hands.Hands(
+    max_num_hands=8,
+    model_complexity=0,
+    min_detection_confidence=0.45,
+    min_tracking_confidence=0.5
+)
 
 async def handle(ws, path=None):
     # support both websockets versions: path may be passed or available on the protocol

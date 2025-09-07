@@ -4,14 +4,17 @@ import json
 import time
 import cv2
 import numpy as np
+import pygame
 try:
     from picamera2 import Picamera2
 except Exception:
     Picamera2 = None
 
 SERVER_URI = "ws://192.168.1.79:8765"  # << replace with your Windows IP
-JPEG_QUALITY = 70
+# Lower quality + resize to reduce round-trip time and CPU on server
+JPEG_QUALITY = 60
 FPS = 60.0
+SEND_WIDTH = 640
 
 class RemoteCameraClient:
     def __init__(self, server_uri=SERVER_URI, usb_index=0, prefer_usb=True, fps=FPS):
@@ -125,6 +128,13 @@ class RemoteCameraClient:
                             tips = data.get("tips", [])
                             with self._lock:
                                 self._latest_tips = tips
+                            # Post a pygame event so the main UI can react immediately
+                            try:
+                                if pygame.get_init():
+                                    ev = pygame.event.Event(pygame.USEREVENT + 1, {"tips": tips})
+                                    pygame.event.post(ev)
+                            except Exception:
+                                pass
                             if tips:
                                 # debug log - helps verify server -> client tip flow
                                 print(f"network_client: received {len(tips)} tips, first screen={tips[0].get('screen')}")
@@ -150,9 +160,20 @@ class RemoteCameraClient:
                         await asyncio.sleep(interval)
                         continue
 
+                    # Resize down (preserve aspect) to reduce network + server load
+                    try:
+                        h, w = frame.shape[:2]
+                        if w > SEND_WIDTH:
+                            new_h = int(SEND_WIDTH * (h / max(1, w)))
+                            frame_send = cv2.resize(frame, (SEND_WIDTH, new_h), interpolation=cv2.INTER_LINEAR)
+                        else:
+                            frame_send = frame
+                    except Exception:
+                        frame_send = frame
+
                     # encode JPEG and send (best-effort)
                     try:
-                        _, jpg = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), JPEG_QUALITY])
+                        _, jpg = cv2.imencode('.jpg', frame_send, [int(cv2.IMWRITE_JPEG_QUALITY), JPEG_QUALITY])
                         await ws.send(jpg.tobytes())
                     except Exception as e:
                         print(f"network_client: send error: {e}")

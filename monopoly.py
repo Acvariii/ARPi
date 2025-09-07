@@ -273,21 +273,27 @@ def run_monopoly_game(screen, num_players, video_manager=None, hand_tracker=None
 
     board_image, board_x, board_y = load_board_image(game_width, game_height, "monopoly.jpg")
 
+    # remote tip cache updated by pygame.USEREVENT+1 (posted by RemoteCameraClient)
+    last_remote_tips = []
+
     # Inner helpers to keep cognitive complexity low in this main function:
     def _get_positions():
         try:
             return get_player_positions(len(players), "square")
         except Exception:
             return [(0, 0)] * len(players)
-
+ 
     def _fetch_tips():
+        # prefer cached remote tips for lowest latency, otherwise call tracker API
+        if last_remote_tips:
+            return list(last_remote_tips)
         if not hand_tracker:
             return []
         try:
             return hand_tracker.get_tips()
         except Exception:
             return []
-
+ 
     def _compute_player_rects_and_assignments(tips, hover_info_local):
         try:
             player_rects_local, action_rects_map_local = draw_player_control_areas(
@@ -487,6 +493,18 @@ def run_monopoly_game(screen, num_players, video_manager=None, hand_tracker=None
     # Main run loop (now delegating to helpers)
     running = True
     while running:
+        # process system / remote-tip events as early as possible (reduce latency)
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                return False
+            elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                return False
+            elif event.type == pygame.USEREVENT + 1:
+                try:
+                    last_remote_tips = event.tips or []
+                except Exception:
+                    last_remote_tips = []
+ 
         current_player = players[current_player_idx]
         positions = _get_positions()
         tips = _fetch_tips()

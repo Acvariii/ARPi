@@ -115,27 +115,41 @@ def show_game_player_selection(screen, game, video_manager=None, hand_tracker=No
     overlay = pygame.Surface(screen.get_size(), pygame.SRCALPHA)
     overlay.fill((25, 25, 35, 200))
 
+    # remote tip cache updated by pygame.USEREVENT+1 (posted by RemoteCameraClient)
+    last_remote_tips = []
+    last_remote_primary = None
+
     running = True
     while running:
-        # prefer hand tracker primary tip; fallback to mouse
-        primary = None
-        tips = []
-        if hand_tracker:
-            try:
-                primary = hand_tracker.get_primary()
-                tips = hand_tracker.get_tips()
-            except Exception:
-                primary = None
-                tips = []
-        mouse_pos = primary if primary is not None else pygame.mouse.get_pos()
-        current_time = time.time()
-
+        # process events early (capture remote-tip event for lowest latency)
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit()
                 sys.exit()
             elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
                 return
+            elif event.type == pygame.USEREVENT + 1:
+                try:
+                    last_remote_tips = event.tips or []
+                    if last_remote_tips:
+                        p = last_remote_tips[0].get("screen")
+                        last_remote_primary = (int(p[0]), int(p[1])) if p else None
+                except Exception:
+                    last_remote_tips = []
+                    last_remote_primary = None
+
+        # prefer cached remote tips (for responsiveness), otherwise call tracker API
+        primary = None
+        tips = []
+        if hand_tracker:
+            try:
+                tips = list(last_remote_tips) if last_remote_tips else hand_tracker.get_tips()
+                primary = last_remote_primary if last_remote_primary is not None else hand_tracker.get_primary()
+            except Exception:
+                primary = None
+                tips = []
+        mouse_pos = primary if primary is not None else pygame.mouse.get_pos()
+        current_time = time.time()
 
         if video_manager and getattr(video_manager, "initialized", False):
             video_manager.update_frame(screen)

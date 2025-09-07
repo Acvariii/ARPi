@@ -29,27 +29,42 @@ def show_game_selection(screen, video_manager=None, hand_tracker=None):
     overlay = pygame.Surface(screen.get_size(), pygame.SRCALPHA)
     overlay.fill((25, 25, 35, 200))  # Semi-transparent dark background
 
+    # remote tip cache updated by pygame.USEREVENT+1 (posted by RemoteCameraClient)
+    last_remote_tips = []
+    last_remote_primary = None
+
     running = True
     while running:
-        # prefer hand tracker primary tip; fallback to mouse
-        primary = None
-        tips = []
-        if hand_tracker:
-            try:
-                # get_primary still useful for hover logic; get_tips used for rendering visible cursors
-                primary = hand_tracker.get_primary()
-                tips = hand_tracker.get_tips()
-            except Exception:
-                primary = None
-                tips = []
-        mouse_pos = primary if primary is not None else pygame.mouse.get_pos()
-        current_time = time.time()
-
+        # handle events (including remote tip event)
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 return False
             elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
                 return False
+            elif event.type == pygame.USEREVENT + 1:
+                # remote tips arrived from network client
+                try:
+                    last_remote_tips = event.tips or []
+                    if last_remote_tips:
+                        p = last_remote_tips[0].get("screen")
+                        last_remote_primary = (int(p[0]), int(p[1])) if p else None
+                except Exception:
+                    last_remote_tips = []
+                    last_remote_primary = None
+
+        # prefer hand tracker / remote primary tip; fallback to mouse
+        primary = None
+        tips = []
+        if hand_tracker:
+            try:
+                # prefer event-updated cached tips for lowest latency
+                tips = list(last_remote_tips) if last_remote_tips else hand_tracker.get_tips()
+                primary = last_remote_primary if last_remote_primary is not None else hand_tracker.get_primary()
+            except Exception:
+                primary = None
+                tips = []
+        mouse_pos = primary if primary is not None else pygame.mouse.get_pos()
+        current_time = time.time()
 
         if video_manager and getattr(video_manager, "initialized", False):
             try:
