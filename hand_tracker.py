@@ -398,6 +398,6 @@ def create_default_hand_tracker():
         screen_size=(1920, 1080),
         max_hands=8,
         smoothing=0.60,
-        target_fps=30,
+        target_fps=60,
         roi_scale=0.98
     )

@@ -18,8 +18,8 @@ mp_hands = mp.solutions.hands
 hands = mp_hands.Hands(
     max_num_hands=8,
     model_complexity=1,
-    min_detection_confidence=0.45,
-    min_tracking_confidence=0.5
+    min_detection_confidence=0.35,
+    min_tracking_confidence=0.4
 )
 
 async def handle(ws, path=None):
