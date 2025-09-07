@@ -79,7 +79,7 @@ class MultiHandTracker:
     def __init__(self,
                  screen_size: Optional[Tuple[int,int]] = None,
                  max_hands: int = 8,
-                 detection_conf: float = 0.45,
+                 detection_conf: float = 0.35,
                  tracking_conf: float = 0.5,
                  roi_scale: float = 0.95,
                  target_fps: float = 60.0,
@@ -156,8 +156,8 @@ class MultiHandTracker:
             try:
                 cap0 = cv2.VideoCapture(0)
                 try:
-                    cap0.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-                    cap0.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+                    cap0.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+                    cap0.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
                     cap0.set(cv2.CAP_PROP_FPS, int(min(60, 1.0 / max(0.001, self._target_dt))))
                 except Exception:
                     pass
