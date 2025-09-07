@@ -49,15 +49,20 @@ def main():
         except Exception:
             hand_tracker = None
 
+    # Choose the active camera source: prefer remote client when available,
+    # otherwise fall back to the local hand tracker.
+    camera_source = remote_client if remote_client is not None else hand_tracker
+
     try:
         # show_game_selection expects hand_tracker-like object (get_tips/get_primary)
         running = show_game_selection(screen, video_manager if video_loaded else None, hand_tracker=camera_source)
     finally:
-        if net_client is not None:
-            try:
-                net_client.stop()
-            except Exception:
-                pass
+        # stop whichever client we actually started
+        try:
+            if remote_client is not None:
+                remote_client.stop()
+        except Exception:
+            pass
         if hand_tracker is not None:
             try:
                 hand_tracker.stop()
