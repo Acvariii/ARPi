@@ -5,7 +5,7 @@ import time
 from constants import init_fonts
 from video_manager import VideoManager
 from network_client import RemoteCameraClient
-from hand_tracker import MultiHandTracker
+from hand_tracker import create_default_hand_tracker
 
 USE_REMOTE = True
 SERVER_URI = "ws://192.168.1.79:8765"
@@ -31,24 +31,23 @@ def main():
     hand_tracker = None
     camera_source = None
 
-    # choose remote or local tracker
+    # Start remote client first (it should try USB OpenCV devices first).
+    remote_client = None
     if USE_REMOTE:
-        net_client = RemoteCameraClient(server_uri=SERVER_URI)
-        net_client.start()
-        camera_source = net_client
-    else:
-        hand_tracker = MultiHandTracker(
-            screen_size=(1920, 1080),
-            max_hands=8,
-            smoothing=0.60,
-            target_fps=30,
-            roi_scale=0.98
-        )
         try:
+            remote_client = RemoteCameraClient(server_uri=SERVER_URI)
+            remote_client.start()
+        except Exception:
+            remote_client = None
+
+    # Only start local tracker when not using remote camera (avoids camera contention)
+    hand_tracker = None
+    if not USE_REMOTE:
+        try:
+            hand_tracker = create_default_hand_tracker()
             hand_tracker.start()
         except Exception:
-            pass
-        camera_source = hand_tracker
+            hand_tracker = None
 
     try:
         # show_game_selection expects hand_tracker-like object (get_tips/get_primary)

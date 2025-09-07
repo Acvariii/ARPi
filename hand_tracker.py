@@ -389,18 +389,15 @@ class MultiHandTracker:
             return None
         return tips[0]["screen"]
 
-# Initialize hand tracker (start immediately) with higher refresh + smoother rendering
-# prefer lower smoothing (more responsive), higher target_fps; tune to your Pi5 performance
-# Projector resolution is fixed: map camera tips into projector coordinates (1920x1080).
-hand_tracker = MultiHandTracker(
-    screen_size=(1920, 1080),   # fixed projector mapping
-    max_hands=8,
-    smoothing=0.60,
-    target_fps=30,
-    roi_scale=0.98
-)
-try:
-    hand_tracker.start()
-except Exception:
-    # ensure app still runs if camera unavailable
-    pass
+# Do NOT auto-start a global tracker on import: that can grab the USB camera and
+# prevent the network client from using it. Call create_default_hand_tracker()
+# and start it explicitly when you want local capture.
+def create_default_hand_tracker():
+    """Create (but don't start) a MultiHandTracker with project defaults."""
+    return MultiHandTracker(
+        screen_size=(1920, 1080),
+        max_hands=8,
+        smoothing=0.60,
+        target_fps=30,
+        roi_scale=0.98
+    )
